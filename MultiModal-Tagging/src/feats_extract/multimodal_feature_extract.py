@@ -198,7 +198,7 @@ class MultiModalFeatureExtract(object):
         print("audio extract cost {} sec".format(end_time - start_time)) 
         #=============================================文本
         start_time = time.time()
-        if txt_file_path is None and os.path.exists(txt_file_path) and self.extract_text:
+        if txt_file_path is not None and os.path.exists(txt_file_path) and self.extract_text:
             print(txt_file_path + ' exist.')
             with open(txt_file_path, 'r') as f:
                 feat_dict['text'] = f.readline().strip('\n')

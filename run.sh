@@ -379,7 +379,7 @@ elif [ "$TYPE" = "test" ]; then
   python -u scripts/inference_for_structuring.py --model_pb "${CHECKPOINT_DIR}" \
                                               --tag_id_file "${TAG_ID_FILE}" \
                                               --test_dir "${TEST_SCENE_VIDEOS_DIR}" \
-                                              --output_json "${OUTPUT_FILE_PATH}"
+                                              --output_json "${OUTPUT_FILE_PATH}" \
                                               --use_gpu ${USE_GPU}
 
   exit 0/
