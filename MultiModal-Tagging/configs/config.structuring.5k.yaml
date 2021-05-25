@@ -9,7 +9,7 @@ ModelConfig:
   with_video_head: True #视频特征
   with_audio_head: True #音频特征
   with_text_head: True  #文本特征
-  with_image_head: True # False #图片特征
+  with_image_head: True #图片特征
 
   #视频特征(16384)
   video_head_type: 'NeXtVLAD'
@@ -84,9 +84,9 @@ OptimizerConfig:
   loss_type_dict:
     tagging: "CrossEntropyLoss"
   max_step_num: 10000
-  decay_steps: 500
+  decay_steps: 1000
   export_model_steps: 1000
-  learning_rate_decay: 0.1
+  learning_rate_decay: 0.5
   start_new_model: True # 如果为True，重新训练； 如果False，则resume
   num_gpu: 1
   log_device_placement: False
