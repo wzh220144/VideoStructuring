@@ -22,6 +22,8 @@ EVERY_MS = 1000 // FPS
 MAX_NUM_FRAMES = -1
 N = 100
 
+os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
+
 class MultiModalFeatureExtract(object):
 
     def get_video_extractor(self, batch_size):
