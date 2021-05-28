@@ -174,6 +174,7 @@ class MultiModalFeatureExtract(object):
             else:
                 if rgb_list == None:
                     rgb_list = self.get_rgb_list(test_file)
+                print('rgb_list size: {}'.format(len(rgb_list)))
                 feat_dict['ocr'] = self.ocr_extractor.request(rgb_list)
                 if save:
                     with open(ocr_path, 'w') as f:
@@ -211,7 +212,7 @@ class MultiModalFeatureExtract(object):
         feat_dict={}
         (feat_dict, rgb_list) = self.extract_video_feat(feat_dict, test_file, video_path, save)
         feat_dict = self.extract_audio_feat(feat_dict, test_file, audio_path, save)
-        (feat_dict, rgb_list) = salf.extract_ocr_feat(feat_dict, test_file, ocr_path, save, rgb_list)
+        (feat_dict, rgb_list) = self.extract_ocr_feat(feat_dict, test_file, ocr_path, save, rgb_list)
         feat_dict = self.extract_asr_feat(feat_dict, test_file, asr_path, save)
         return feat_dict
 

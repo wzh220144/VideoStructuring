@@ -18,11 +18,11 @@ class VideoOCR():
         self.reader = easyocr.Reader(['ch_sim','en'], gpu = use_gpu)
     """视频OCR"""
     def request(self, rgb_list):
-        res = set([])
+        res = []
         for rgb in rgb_list:
-            t = self.reader.readtext(rgb, detail=0)
-            for x in t:
-                res.add(x)
+            t = '|'.join(self.reader.readtext(rgb, detail=0))
+            print(t)
+            res.append(t)
         return res
     
 class ImageOCR():
@@ -32,8 +32,7 @@ class ImageOCR():
     """图像OCR"""
     def request(self, file_name):
         res = self.reader.readtext(file_name, detail = 0)
-        res = set(res)
-        return '|'.join(list(res))
+        return res
    
 if __name__ == '__main__':
     test_image = './test.jpg'
