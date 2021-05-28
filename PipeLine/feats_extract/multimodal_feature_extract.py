@@ -78,22 +78,34 @@ class MultiModalFeatureExtract(object):
         if not video_capture.open(filename):
           print(sys.stderr, 'Error: Cannot open video file ' + filename)
           return
-        last_ts = -99999  # The timestamp of last retrieved frame.
         num_retrieved = 0
+        frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        rate = int(video_capture.get(cv2.CAP_PROP_FPS))
+        step = 1000.0 / rate
+        frames = set([])
+        cur_frame = 0
+        frames.add(cur_frame)
+        cur = 0
+        index = 1
+        while True:
+            cur_frame += 1
+            cur += step
+            if cur_frame >= frame_count:
+                break
+            if cur >= index * every_ms:
+                index += 1
+                frames.add(cur_frame)
+        frames.add(frame_count - 1)
 
+        cur_frame = 0
         frame_all = []
         while True:
-            if max_num_frames != -1 and num_retrieved >= max_num_frames:
-                break
-            while video_capture.get(cv2.CAP_PROP_POS_MSEC) < every_ms + last_ts:
-                if not video_capture.read()[0]:
-                    return frame_all
-            last_ts = video_capture.get(cv2.CAP_PROP_POS_MSEC)
             has_frames, frame = video_capture.read()
             if not has_frames:
                 break
-            frame_all.append(frame[:, :, ::-1])
-            num_retrieved += 1
+            if cur_frame in frames:
+                frame_all.append(frame[:, :, ::-1])
+            cur_frame += 1
         return frame_all
 
     #等频率抽取n+1帧; 第一帧及最后一帧放入
@@ -111,7 +123,7 @@ class MultiModalFeatureExtract(object):
         frames.add(cur_frame)
         while True:
             cur_frame += step
-            if cur_frame > frame_count:
+            if cur_frame >= frame_count:
                 break
             frames.add(cur_frame)
         frames.add(frame_count - 1)
