@@ -130,6 +130,7 @@ class MultiModalFeatureExtract(object):
         if self.extract_video:
             start_time = time.time()
             if video_path is not None and os.path.exists(video_path):
+                print(video_path + ' exist.')
                 feat_dict['video'] = np.load(video_path)
             else:
                 if rgb_list == None:
@@ -145,6 +146,7 @@ class MultiModalFeatureExtract(object):
         if self.extract_audio:
             start_time = time.time()
             if audio_path is not None and os.path.exists(audio_path):
+                print(audio_path + ' exist.')
                 feat_dict['audio'] = np.load(audio_path)
             else:
                 output_audio = test_file.replace('.mp4', '.wav')
@@ -169,12 +171,13 @@ class MultiModalFeatureExtract(object):
                 print(ocr_path + ' exist.')
                 with open(ocr_path, 'r') as f:
                     feat_dict['ocr'] = f.readline().strip('\n').split('\x001')
-            if rgb_list == None:
-                rgb_list = self.get_rgb_list(test_file)
-            feat_dict['ocr'] = self.ocr_extractor.request(rgb_list)
-            if save:
-                with open(ocr_path, 'w') as f:
-                    f.write(feat_dict['text'])
+            else:
+                if rgb_list == None:
+                    rgb_list = self.get_rgb_list(test_file)
+                feat_dict['ocr'] = self.ocr_extractor.request(rgb_list)
+                if save:
+                    with open(ocr_path, 'w') as f:
+                        f.write('\x001'.join(feat_dict['ocr']))
             end_time = time.time()
             print("{}: ocr extract cost {} sec".format(test_file, end_time - start_time))
         return (feat_dict, rgb_list)
@@ -182,28 +185,33 @@ class MultiModalFeatureExtract(object):
     def extract_asr_feat(self, feat_dict, test_file, asr_path, save):
         if self.extract_asr:
             start_time = time.time()
-            output_audio = test_file.replace('.mp4', '.wav')
-            video_asr = ''
-            self.trans2audio(test_file, output_audio)
-            if os.path.exists(output_audio):
-                try:
-                    video_asr = self.asr_extractor.request(output_audio)
-                except:
-                    print(output_audio)
-                    print(traceback.format_exc())
-            feat_dict['asr'] = video_asr
-            if save:
-                with open(asr_path, 'w') as f:
-                    f.write(feat_dict['text'])
+            if asr_path is not None and os.path.exists(asr_path):
+                print(asr_path + ' exist.')
+                with open(asr_path, 'r') as f:
+                    feat_dict['asr'] = f.readline().strip('\n').split('\x001')
+            else:
+                output_audio = test_file.replace('.mp4', '.wav')
+                video_asr = ''
+                self.trans2audio(test_file, output_audio)
+                if os.path.exists(output_audio):
+                    try:
+                        video_asr = self.asr_extractor.request(output_audio)
+                    except:
+                        print(output_audio)
+                        print(traceback.format_exc())
+                feat_dict['asr'] = video_asr
+                if save:
+                    with open(asr_path, 'w') as f:
+                        f.write('\x001'.join(feat_dict['text']))
             end_time = time.time()
             print("{}: asr extract cost {} sec".format(test_file, end_time - start_time))
         return feat_dict
 
     def extract_feat(self, test_file, video_path=None, audio_path=None, ocr_path=None, asr_path=None, save=True):
         feat_dict={}
-        (rgb_list, feat_dict) = self.extract_video_feat(feat_dict, test_file, video_path, save)
+        (feat_dict, rgb_list) = self.extract_video_feat(feat_dict, test_file, video_path, save)
         feat_dict = self.extract_audio_feat(feat_dict, test_file, audio_path, save)
-        (rgb_list, feat_dict) = self.extract_ocr_feat(self, feat_dict, test_file, ocr_path, save, rgb_list)
+        (feat_dict, rgb_list) = salf.extract_ocr_feat(feat_dict, test_file, ocr_path, save, rgb_list)
         feat_dict = self.extract_asr_feat(feat_dict, test_file, asr_path, save)
         return feat_dict
 
