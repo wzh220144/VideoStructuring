@@ -23,7 +23,7 @@ class VideoOCR():
             t = self.reader.readtext(rgb, detail=0)
             for x in t:
                 res.add(x)
-        return '|'.join(list(res))
+        return res
     
 class ImageOCR():
     def __init__(self, use_gpu):
