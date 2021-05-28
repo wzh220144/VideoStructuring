@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-MODEL_DIR = os.path.join('pretrained', 'finetuned_resnet101')
+MODEL_DIR = os.path.join('/home/tione/notebook/VideoStructuring/pretrained', 'finetuned_resnet101')
 print(MODEL_DIR)
 
 class FinetunedResnet101Extractor(object):

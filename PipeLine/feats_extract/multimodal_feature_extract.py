@@ -7,15 +7,14 @@ import tensorflow as tf
 import json
 import traceback
 
-from src.feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeatureExtractor
-from src.feats_extract.imgfeat_extractor.finetuned_resnet101 import FinetunedResnet101Extractor
-from src.feats_extract.txt_extractor.text_requests import VideoASR,VideoOCR,ImageOCR
-from src.feats_extract.audio_extractor import vggish_input,vggish_params,vggish_postprocess,vggish_slim
-from src.dataloader.preprocess.cnn_preprocessing import inception_preprocessing
+from feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeatureExtractor
+from feats_extract.imgfeat_extractor.finetuned_resnet101 import FinetunedResnet101Extractor
+from feats_extract.txt_extractor.text_requests import VideoASR,VideoOCR,ImageOCR
+from feats_extract.audio_extractor import vggish_input,vggish_params,vggish_postprocess,vggish_slim
 
-BASE = ""
-PCA_PARAMS_PATH = BASE + "pretrained/vggfish/vggish_pca_params.npz"
-VGGISH_CHECKPOINT_PATH = BASE + "pretrained/vggfish/vggish_model.ckpt"
+BASE = "/home/tione/notebook/VideoStructuring"
+PCA_PARAMS_PATH = BASE + "/pretrained/vggfish/vggish_pca_params.npz"
+VGGISH_CHECKPOINT_PATH = BASE + "/pretrained/vggfish/vggish_model.ckpt"
 VIDEO_EXTRACTOR = 'Youtube8M'
 FPS = 20
 MODE = 1    #1表示将视频等分成n份, 2表示将取视频前n帧，每帧间隔 x ms
@@ -135,7 +134,7 @@ class MultiModalFeatureExtract(object):
             else:
                 if rgb_list == None:
                     rgb_list = self.get_rgb_list(test_file)
-                feat_dict['video'] = self.extractor.extract_rgb_frame_features_list(rgb_list, self.batch_size)
+                feat_dict['video'] = self.video_extractor.extract_rgb_frame_features_list(rgb_list, self.batch_size)
             if save:
                 np.save(video_path, feat_dict['video'])
             end_time = time.time()

@@ -18,9 +18,9 @@
 import numpy as np
 import resampy
 
-from src.feats_extract.audio_extractor import mel_features
+from feats_extract.audio_extractor import mel_features
 
-from src.feats_extract.audio_extractor import vggish_params
+from feats_extract.audio_extractor import vggish_params
 
 import soundfile as sf
 

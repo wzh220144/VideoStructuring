@@ -20,6 +20,7 @@ def process_file(gen, file_path, video_path, audio_path, ocr_path, asr_path):
         print(file_path, traceback.format_exc())
 
 if __name__ == '__main__':
+    start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--files_dir', default='/home/tione/notebook/dataset/structuring/test5k_split_video', type=str)
     parser.add_argument('--postfix', default='mp4', type=str)
@@ -43,7 +44,7 @@ if __name__ == '__main__':
     os.makedirs(ocr_folder, exist_ok=True)
     os.makedirs(asr_folder, exist_ok=True)
 
-    gen = MultiModalFeatureExtract(batch_size = args.image_batch_size, extract_video = args.extract_video,
+    gen = MultiModalFeatureExtract(batch_size = args.batch_size, extract_video = args.extract_video,
                                    extract_audio = args.extract_audio, extract_ocr = args.extract_ocr,
                                    extract_asr = args.extract_asr, use_gpu = args.use_gpu)
 
@@ -52,12 +53,14 @@ if __name__ == '__main__':
     print('start extract feats')
     ps = []
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
-        for file_path in tqdm.tqdm(file_paths, total=len(file_paths), desc='feat extract'):
+        for file_path in file_paths:
             vid = os.path.basename(file_path).split('.m')[0]
             video_path = os.path.join(video_folder, vid+'.npy')
             audio_path = os.path.join(audio_folder, vid+'.npy')
             ocr_path = os.path.join(ocr_folder, vid+'.txt')
             asr_path = os.path.join(asr_folder, vid+'.txt')
             ps.append(executor.submit(process_file, gen, file_path, video_path, audio_path, ocr_path, asr_path))
-        for p in ps:
+        for p in tqdm.tqdm(ps, total=len(ps), desc='feat extract'):
             p.result()
+            end_time = time.time()
+            print('cur cost: {} sec'.format(end_time - start_time))
