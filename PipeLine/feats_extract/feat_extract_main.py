@@ -9,6 +9,7 @@ import glob
 import traceback
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from feats_extract.multimodal_feature_extract import MultiModalFeatureExtract
+import time
 
 def process_file(gen, file_path, video_path, audio_path, ocr_path, asr_path):
     if not os.path.exists(file_path):
