@@ -160,9 +160,10 @@ class MultiModalFeatureExtract(object):
                 print(youtube8m_path + ' exist.')
                 feat_dict['youtube8m'] = np.load(youtube8m_path)
             else:
-                rgb_list = self.get_rgb_list(test_file, 3)
-                t = random.randint(0,1)
-                feat_dict['youtube8m'] = self.youtube8m_extractors[t].extract_rgb_frame_features_list(rgb_list, self.batch_size)
+                feat_dict['youtube8m'] = []
+                for x in  self.gen_batch(self.get_rgb_list(test_file, 3), self.batch_size):
+                    t = random.randint(0,1)
+                    feat_dict['youtube8m'].extend(self.youtube8m_extractors[t].extract_rgb_frame_features_list(x, self.batch_size))
             if save:
                 np.save(youtube8m_path, feat_dict['youtube8m'])
             end_time = time.time()
@@ -199,8 +200,9 @@ class MultiModalFeatureExtract(object):
                 with open(ocr_path, 'r') as f:
                     feat_dict['ocr'] = f.readline().strip('\n').split('\x001')
             else:
-                rgb_list = self.get_all_frames(test_file)
-                feat_dict['ocr'] = self.ocr_extractor.request(rgb_list)
+                feat_dict['ocr'] = []
+                for x in self.gen_batch(self.get_rgb_list(test_file, 3), self.batch_size):
+                    feat_dict['ocr'].extend(self.ocr_extractor.request(x))
                 if save:
                     with open(ocr_path, 'w') as f:
                         f.write('\x001'.join(feat_dict['ocr']))
