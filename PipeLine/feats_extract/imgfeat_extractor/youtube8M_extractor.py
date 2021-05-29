@@ -175,6 +175,7 @@ class YouTube8MFeatureExtractor(object):
 
   def _load_inception(self, proto_file):
     if self.tf_device != 'cpu':
+      print(self.tf_device)
       with tf.device(self.tf_device):
         graph_def = tf.GraphDef.FromString(open(proto_file, 'rb').read())
         self._inception_graph = tf.Graph()
@@ -182,8 +183,8 @@ class YouTube8MFeatureExtractor(object):
                         log_device_placement=True)
         config.gpu_options.allow_growth = True
         with self._inception_graph.as_default():
-        _ = tf.import_graph_def(graph_def, name='')
-        self.session = tf.Session(config=config)
+            _ = tf.import_graph_def(graph_def, name='')
+            self.session = tf.Session(config=config)
     else:
       graph_def = tf.GraphDef.FromString(open(proto_file, 'rb').read())
       self._inception_graph = tf.Graph()
@@ -191,8 +192,8 @@ class YouTube8MFeatureExtractor(object):
                               log_device_placement=True)
       config.gpu_options.allow_growth = True
       with self._inception_graph.as_default():
-        _ = tf.import_graph_def(graph_def, name='')
-      self.session = tf.Session(config=config)
+          _ = tf.import_graph_def(graph_def, name='')
+          self.session = tf.Session(config=config)
 
   def _load_pca(self):
     self.pca_mean = np.load(
