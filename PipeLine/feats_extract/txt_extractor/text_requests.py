@@ -2,6 +2,7 @@
 import easyocr
 import cv2
 import speech_recognition as sr
+import random
 
 class VideoASR():
     def __init__(self, use_gpu):
@@ -15,27 +16,15 @@ class VideoASR():
     
 class VideoOCR():
     def __init__(self, use_gpu):
-        self.reader = easyocr.Reader(['ch_sim','en'], gpu = use_gpu)
+            self.readers = [easyocr.Reader(['ch_sim','en'], gpu = 'cuda:0'), easyocr.Reader(['ch_sim','en'], gpu = 'cuda:1')]
+            #self.reader = easyocr.Reader(['ch_sim','en'], gpu = 'cuda')
     """视频OCR"""
     def request(self, rgb_list):
+        index = random.randint(0, 1)
         res = []
         for rgb in rgb_list:
-            t = '|'.join(self.reader.readtext(rgb, detail=0))
-            print(t)
+            t = '|'.join(self.readers[index].readtext(rgb, detail=0))
+            #t = '|'.join(self.reader.readtext(rgb, detail=0))
             res.append(t)
         return res
     
-class ImageOCR():
-    def __init__(self, use_gpu):
-        self.reader = easyocr.Reader(['ch_sim','en'], gpu = use_gpu)
-
-    """图像OCR"""
-    def request(self, file_name):
-        res = self.reader.readtext(file_name, detail = 0)
-        return res
-   
-if __name__ == '__main__':
-    test_image = './test.jpg'
-    image_ocr = ImageOCR().request(test_image)
-    print("image_ocr: {}".format(image_ocr))
-

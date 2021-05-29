@@ -27,11 +27,11 @@ if __name__ == '__main__':
     parser.add_argument('--postfix', default='mp4', type=str)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/structuring/test5k_split_video_feats')
-    parser.add_argument('--extract_ocr', type=bool, default=True)
-    parser.add_argument('--extract_video', type=bool, default=False)
-    parser.add_argument('--extract_audio', type=bool, default=False)
+    parser.add_argument('--extract_ocr', type=bool, default=False)
+    parser.add_argument('--extract_video', type=bool, default=True)
+    parser.add_argument('--extract_audio', type=bool, default=True)
     parser.add_argument('--extract_asr', type=bool, default=False)
-    parser.add_argument('--max_worker', type=int, default=20)
+    parser.add_argument('--max_worker', type=int, default=40)
     parser.add_argument('--use_gpu', type=bool, default=True)
     args = parser.parse_args()
 
@@ -61,6 +61,7 @@ if __name__ == '__main__':
             ocr_path = os.path.join(ocr_folder, vid+'.txt')
             asr_path = os.path.join(asr_folder, vid+'.txt')
             ps.append(executor.submit(process_file, gen, file_path, video_path, audio_path, ocr_path, asr_path))
+            #process_file(gen, file_path, video_path, audio_path, ocr_path, asr_path)
         for p in tqdm.tqdm(ps, total=len(ps), desc='feat extract'):
             p.result()
             end_time = time.time()
