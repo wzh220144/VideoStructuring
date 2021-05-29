@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     gens = []
     for device in ['0', '1']:
-        with tf.device('gpu:{}'.format(device)):
+        with tf.device('/gpu:{}'.format(device)):
             gens.append(MultiModalFeatureExtract(batch_size=args.batch_size, extract_youtube8m=args.extract_youtube8m,
                                             extract_vggish=args.extract_vggish, extract_ocr=args.extract_ocr,
                                             extract_asr=args.extract_asr, use_gpu=args.use_gpu, device='cudo:{}'.format(device)))
