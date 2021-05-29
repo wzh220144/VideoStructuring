@@ -28,25 +28,25 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/structuring/test5k_split_video_feats')
     parser.add_argument('--extract_ocr', type=bool, default=False)
-    parser.add_argument('--extract_video', type=bool, default=True)
-    parser.add_argument('--extract_audio', type=bool, default=True)
+    parser.add_argument('--extract_youtube8m', type=bool, default=True)
+    parser.add_argument('--extract_vggish', type=bool, default=True)
     parser.add_argument('--extract_asr', type=bool, default=False)
     parser.add_argument('--max_worker', type=int, default=40)
     parser.add_argument('--use_gpu', type=bool, default=True)
     args = parser.parse_args()
 
-    video_folder = args.feat_dir + '/video'
-    audio_folder = args.feat_dir + '/audio'
+    youtube8m_folder = args.feat_dir + '/video'
+    vggish_folder = args.feat_dir + '/audio'
     ocr_folder = args.feat_dir + '/ocr'
     asr_folder = args.feat_dir + '/asr'
     os.makedirs(args.feat_dir, exist_ok=True)
-    os.makedirs(video_folder, exist_ok=True)
-    os.makedirs(audio_folder, exist_ok=True)
+    os.makedirs(youtube8m_folder, exist_ok=True)
+    os.makedirs(vggish_folder, exist_ok=True)
     os.makedirs(ocr_folder, exist_ok=True)
     os.makedirs(asr_folder, exist_ok=True)
 
-    gen = MultiModalFeatureExtract(batch_size = args.batch_size, extract_video = args.extract_video,
-                                   extract_audio = args.extract_audio, extract_ocr = args.extract_ocr,
+    gen = MultiModalFeatureExtract(batch_size = args.batch_size, extract_youtube8m = args.extract_youtube8m,
+                                   extract_vggish = args.extract_vggish, extract_ocr = args.extract_ocr,
                                    extract_asr = args.extract_asr, use_gpu = args.use_gpu)
 
     file_paths = glob.glob(args.files_dir+'/*.'+args.postfix)
@@ -56,11 +56,11 @@ if __name__ == '__main__':
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
         for file_path in file_paths:
             vid = os.path.basename(file_path).split('.m')[0]
-            video_path = os.path.join(video_folder, vid+'.npy')
-            audio_path = os.path.join(audio_folder, vid+'.npy')
+            youtube8m_path = os.path.join(youtube8m_folder, vid+'.npy')
+            vggish_path = os.path.join(vggish_folder, vid+'.npy')
             ocr_path = os.path.join(ocr_folder, vid+'.txt')
             asr_path = os.path.join(asr_folder, vid+'.txt')
-            ps.append(executor.submit(process_file, gen, file_path, video_path, audio_path, ocr_path, asr_path))
+            ps.append(executor.submit(process_file, gen, file_path, youtube8m_path, vggish_path, ocr_path, asr_path))
             #process_file(gen, file_path, video_path, audio_path, ocr_path, asr_path)
         for p in tqdm.tqdm(ps, total=len(ps), desc='feat extract'):
             p.result()

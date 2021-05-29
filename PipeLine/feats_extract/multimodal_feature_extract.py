@@ -17,12 +17,6 @@ BASE = "/home/tione/notebook/VideoStructuring"
 PCA_PARAMS_PATH = BASE + "/pretrained/vggfish/vggish_pca_params.npz"
 VGGISH_CHECKPOINT_PATH = BASE + "/pretrained/vggfish/vggish_model.ckpt"
 VIDEO_EXTRACTOR = 'Youtube8M'
-FPS = 5
-MODE = 2    #1表示将视频等分成n份, 2表示将取视频前n帧，每帧间隔 x ms
-EVERY_MS = 1000 // FPS
-MAX_NUM_FRAMES = -1
-N = 100
-
 os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
 
 class MultiModalFeatureExtract(object):
@@ -37,28 +31,25 @@ class MultiModalFeatureExtract(object):
 
     """docstring for ClassName"""
     def __init__(self, batch_size = 1,
-                 extract_video = True,
-                 extract_audio = True,
+                 extract_youtube8m = True,
+                 extract_vggish = True,
                  extract_ocr = True,
                  extract_asr = True,
                  use_gpu = True,
                  ):
         super(MultiModalFeatureExtract, self).__init__()
-        self.extract_video = extract_video
-        self.extract_audio = extract_audio
+        self.extract_youtube8m = extract_youtube8m
+        self.extract_vggish = extract_vggish
         self.extract_ocr = extract_ocr
         self.extract_asr = extract_asr
         self.batch_size = batch_size
 
         #视频特征抽取模型
-        if extract_video:
-            self.video_extractors = [
-                    self.get_video_extractor('cuda:0', batch_size),
-                    self.get_video_extractor('cuda:1', batch_size),
-                    ]
+        if extract_youtube8m:
+            self.youtube8m_extractor = YouTube8MFeatureExtractor('cuda', use_batch = batch_size != 1)
 
         #音频特征抽取模型
-        if extract_audio:
+        if extract_vggish:
             self.pproc = vggish_postprocess.Postprocessor(PCA_PARAMS_PATH)  # audio pca
             self.audio_graph = tf.Graph()
             config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
@@ -84,7 +75,6 @@ class MultiModalFeatureExtract(object):
         if not video_capture.open(filename):
           print(sys.stderr, 'Error: Cannot open video file ' + filename)
           return
-        num_retrieved = 0
         frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
         rate = int(video_capture.get(cv2.CAP_PROP_FPS))
         step = 1000.0 / rate
@@ -119,6 +109,21 @@ class MultiModalFeatureExtract(object):
         print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frame_all)))
         return frame_all
 
+    def get_all_frames(self, filename):
+        video_capture = cv2.VideoCapture()
+        if not video_capture.open(filename):
+          print(sys.stderr, 'Error: Cannot open video file ' + filename)
+          return
+        frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_all = []
+        while True:
+            has_frames, frame = video_capture.read()
+            if not has_frames:
+                break
+            frame_all.append(frame[:, :, ::-1])
+        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frame_all)))
+        return frame_all
+
     #等频率抽取n+1帧; 第一帧及最后一帧放入
     def get_frames_n_split(self, filename, n):
         video_capture = cv2.VideoCapture()
@@ -150,28 +155,28 @@ class MultiModalFeatureExtract(object):
         print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frame_all)))
         return frame_all
 
-    def extract_video_feat(self, feat_dict, test_file, video_path, save):
-        if self.extract_video:
+    def extract_youtube8m_feat(self, feat_dict, test_file, youtube8m_path, save):
+        if self.extract_youtube8m:
             start_time = time.time()
-            if video_path is not None and os.path.exists(video_path):
-                print(video_path + ' exist.')
-                feat_dict['video'] = np.load(video_path)
+            if youtube8m_path is not None and os.path.exists(youtube8m_path):
+                print(youtube8m_path + ' exist.')
+                feat_dict['youtube8m'] = np.load(youtube8m_path)
             else:
-                rgb_list = self.get_rgb_list(test_file, 1000, -1)
-                t = random.randint(0,1)
-                feat_dict['video'] = self.video_extractors[t].extract_rgb_frame_features_list(rgb_list, self.batch_size)
+                rgb_list = self.get_rgb_list(test_file, 3)
+                #t = random.randint(0,1)
+                feat_dict['youtube8m'] = self.youtube8m_extractor.extract_rgb_frame_features_list(rgb_list, self.batch_size)
             if save:
-                np.save(video_path, feat_dict['video'])
+                np.save(youtube8m_path, feat_dict['youtube8m'])
             end_time = time.time()
-            print("{}: video extract cost {} sec".format(test_file, end_time - start_time))
+            print("{}: youtube8m extract cost {} sec".format(test_file, end_time - start_time))
         return feat_dict
 
-    def extract_audio_feat(self, feat_dict, test_file, audio_path, save):
-        if self.extract_audio:
+    def extract_vggish_feat(self, feat_dict, test_file, vggish_path, save):
+        if self.extract_vggish:
             start_time = time.time()
-            if audio_path is not None and os.path.exists(audio_path):
-                print(audio_path + ' exist.')
-                feat_dict['audio'] = np.load(audio_path)
+            if vggish_path is not None and os.path.exists(vggish_path):
+                print(vggish_path + ' exist.')
+                feat_dict['vggish'] = np.load(vggish_path)
             else:
                 output_audio = test_file.replace('.mp4', '.wav')
                 self.trans2audio(test_file, output_audio)
@@ -179,24 +184,24 @@ class MultiModalFeatureExtract(object):
                     examples_batch = vggish_input.wavfile_to_examples(output_audio)
                     [embedding_batch] = self.audio_sess.run([self.embedding_tensor],
                                                             feed_dict={self.features_tensor: examples_batch})
-                    feat_dict['audio'] = self.pproc.postprocess(embedding_batch)
+                    feat_dict['vggish'] = self.pproc.postprocess(embedding_batch)
                     if save:
-                        np.save(audio_path, feat_dict['audio'])
+                        np.save(vggish_path, feat_dict['vggish'])
                 else:
-                    feat_dict['audio'] = []
+                    feat_dict['vggish'] = []
             end_time = time.time()
-            print("{}: audio extract cost {} sec".format(test_file, end_time - start_time))
+            print("{}: vggish extract cost {} sec".format(test_file, end_time - start_time))
         return feat_dict
 
     def extract_ocr_feat(self, feat_dict, test_file, ocr_path, save):
         if self.extract_ocr:
             start_time = time.time()
-            if ocr_path is not None and os.path.exists(ocr_path) and self.extract_text:
+            if ocr_path is not None and os.path.exists(ocr_path):
                 print(ocr_path + ' exist.')
                 with open(ocr_path, 'r') as f:
                     feat_dict['ocr'] = f.readline().strip('\n').split('\x001')
             else:
-                rgb_list = self.get_rgb_list(test_file)
+                rgb_list = self.get_all_frames(test_file)
                 feat_dict['ocr'] = self.ocr_extractor.request(rgb_list)
                 if save:
                     with open(ocr_path, 'w') as f:
@@ -230,10 +235,10 @@ class MultiModalFeatureExtract(object):
             print("{}: asr extract cost {} sec".format(test_file, end_time - start_time))
         return feat_dict
 
-    def extract_feat(self, test_file, video_path=None, audio_path=None, ocr_path=None, asr_path=None, save=True):
+    def extract_feat(self, test_file, youtube8m_path=None, vggish_path=None, ocr_path=None, asr_path=None, save=True):
         feat_dict={}
-        feat_dict = self.extract_video_feat(feat_dict, test_file, video_path, save)
-        feat_dict = self.extract_audio_feat(feat_dict, test_file, audio_path, save)
+        feat_dict = self.extract_youtube8m_feat(feat_dict, test_file, youtube8m_path, save)
+        feat_dict = self.extract_vggish_feat(feat_dict, test_file, vggish_path, save)
         feat_dict = self.extract_ocr_feat(feat_dict, test_file, ocr_path, save)
         feat_dict = self.extract_asr_feat(feat_dict, test_file, asr_path, save)
         return feat_dict
@@ -244,10 +249,12 @@ class MultiModalFeatureExtract(object):
             os.system(command)
             print("audio file not exists: {}".format(output_audio))
 
-    def get_rgb_list(self, path, every_ms = EVERY_MS, max_num_frames = MAX_NUM_FRAMES):
+    def get_rgb_list(self, path, mode, n = None, every_ms = None, max_num_frames = None):
         rgb_list = []
-        if MODE == 1:
-            rgb_list = self.get_frames_n_split(path, N)
-        elif MODE == 2:
-            rgb_list = self.get_frames_same_interval(path, EVERY_MS, MAX_NUM_FRAMES)
+        if mode == 1:
+            rgb_list = self.get_frames_n_split(path, n)
+        elif mode == 2:
+            rgb_list = self.get_frames_same_interval(path, every_ms, max_num_frames)
+        else:
+            rgb_list = self.get_all_frames(path)
         return rgb_list
