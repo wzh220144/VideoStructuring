@@ -7,6 +7,7 @@ import tensorflow as tf
 import json
 import traceback
 import random
+from tqdm import tqdm
 
 from feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeatureExtractor
 from feats_extract.imgfeat_extractor.finetuned_resnet101 import FinetunedResnet101Extractor
@@ -118,16 +119,14 @@ class MultiModalFeatureExtract(object):
           return
         frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
         print('{} has {} frames, sample {} frames.'.format(filename, frame_count, frame_count))
-
-        widgets = ['extract {}: '.format(filename), Percentage(), ' ', Bar('='), ' ', Timer()]
-        pbar = ProgressBar(widgets=widgets, maxval=frame_count).start()
+        progress_bar = tqdm(total=frame_count, unit='frame'.format(filename), miniters=1, desc="extract {}".format(filename))
         while True:
             has_frames, frame = video_capture.read()
             if not has_frames:
                 break
-            pbar.update(1)
+            progress_bar.update(1)
             yield frame[:, :, ::-1]
-        pbar.finish()
+        progress_bar.close()
 
     #等频率抽取n+1帧; 第一帧及最后一帧放入
     def get_frames_n_split(self, filename, n):
