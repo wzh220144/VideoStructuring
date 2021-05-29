@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--extract_youtube8m', type=bool, default=True)
     parser.add_argument('--extract_vggish', type=bool, default=True)
     parser.add_argument('--extract_asr', type=bool, default=False)
-    parser.add_argument('--max_worker', type=int, default=10)
+    parser.add_argument('--max_worker', type=int, default=30)
     parser.add_argument('--use_gpu', type=bool, default=True)
     args = parser.parse_args()
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     gens = []
     for device in ['0', '1']:
-        with tf.device('gpu:{}'.format(device)):
+        with tf.device('/gpu:{}'.format(device)):
             gens.append(MultiModalFeatureExtract(batch_size=args.batch_size, extract_youtube8m=args.extract_youtube8m,
                                             extract_vggish=args.extract_vggish, extract_ocr=args.extract_ocr,
                                             extract_asr=args.extract_asr, use_gpu=args.use_gpu, device='cuda:{}'.format(device)))
