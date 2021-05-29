@@ -12,6 +12,7 @@ from feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeature
 from feats_extract.imgfeat_extractor.finetuned_resnet101 import FinetunedResnet101Extractor
 from feats_extract.txt_extractor.text_requests import VideoASR,VideoOCR
 from feats_extract.audio_extractor import vggish_input,vggish_params,vggish_postprocess,vggish_slim
+from progressbar import *
 
 BASE = "/home/tione/notebook/VideoStructuring"
 PCA_PARAMS_PATH = BASE + "/pretrained/vggfish/vggish_pca_params.npz"
@@ -118,10 +119,14 @@ class MultiModalFeatureExtract(object):
           return
         frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
         print('{} has {} frames, sample {} frames.'.format(filename, frame_count, frame_count))
+
+        widgets = ['extract {}: ', Percentage(), ' ', Bar('#'), ' ', Timer()]
+        pbar = ProgressBar(widgets=widgets, maxval=frame_count).start()
         while True:
             has_frames, frame = video_capture.read()
             if not has_frames:
                 break
+            pbar.update(1)
             yield frame[:, :, ::-1]
 
     #等频率抽取n+1帧; 第一帧及最后一帧放入

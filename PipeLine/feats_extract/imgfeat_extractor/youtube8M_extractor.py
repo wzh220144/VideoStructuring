@@ -63,7 +63,14 @@ class YouTube8MFeatureExtractor(object):
     # Create MODEL_DIR if not created.
     self._model_dir = model_dir
     assert os.path.exists(model_dir)
-    self.device = torch.device(device)
+    if device == '0' or device == '1':
+      self.device = torch.device('cuda:{}'.format(device))
+    else:
+      self.device = torch.device('cpu')
+    if device == '0' or device == '1':
+      self.tf_device = 'gpu:{}'.format(device)
+    else:
+      self.tf_device = 'cpu'
     if use_batch:
       inception_proto_file = os.path.join(self._model_dir, 'classify_image_graph_def_batch.pb')
     else:
@@ -72,8 +79,6 @@ class YouTube8MFeatureExtractor(object):
     self._load_inception(inception_proto_file)
 
     pca_mean = os.path.join(self._model_dir, 'mean.npy')
-    if not os.path.exists(pca_mean):
-      tarfile.open(download_path, 'r:gz').extractall(model_dir)
     self._load_pca()
     self._load_pca_gpu()
 
@@ -169,13 +174,24 @@ class YouTube8MFeatureExtractor(object):
     return feats
 
   def _load_inception(self, proto_file):
-    graph_def = tf.GraphDef.FromString(open(proto_file, 'rb').read())
-    self._inception_graph = tf.Graph()
-    config = tf.ConfigProto(allow_soft_placement=True,
+    if self.tf_device != 'cpu':
+      with tf.device(self.tf_device):
+        graph_def = tf.GraphDef.FromString(open(proto_file, 'rb').read())
+        self._inception_graph = tf.Graph()
+        config = tf.ConfigProto(allow_soft_placement=True,
                         log_device_placement=True)
-    config.gpu_options.allow_growth = True
-    with self._inception_graph.as_default():
-      _ = tf.import_graph_def(graph_def, name='')
+        config.gpu_options.allow_growth = True
+        with self._inception_graph.as_default():
+        _ = tf.import_graph_def(graph_def, name='')
+        self.session = tf.Session(config=config)
+    else:
+      graph_def = tf.GraphDef.FromString(open(proto_file, 'rb').read())
+      self._inception_graph = tf.Graph()
+      config = tf.ConfigProto(allow_soft_placement=True,
+                              log_device_placement=True)
+      config.gpu_options.allow_growth = True
+      with self._inception_graph.as_default():
+        _ = tf.import_graph_def(graph_def, name='')
       self.session = tf.Session(config=config)
 
   def _load_pca(self):
