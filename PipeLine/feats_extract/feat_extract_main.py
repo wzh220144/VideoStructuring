@@ -10,6 +10,8 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from feats_extract.multimodal_feature_extract import MultiModalFeatureExtract
 import time
+import tensorflow as tf
+import random
 
 def process_file(gen, file_path, video_path, audio_path, ocr_path, asr_path):
     if not os.path.exists(file_path):
@@ -45,9 +47,12 @@ if __name__ == '__main__':
     os.makedirs(ocr_folder, exist_ok=True)
     os.makedirs(asr_folder, exist_ok=True)
 
-    gen = MultiModalFeatureExtract(batch_size = args.batch_size, extract_youtube8m = args.extract_youtube8m,
-                                   extract_vggish = args.extract_vggish, extract_ocr = args.extract_ocr,
-                                   extract_asr = args.extract_asr, use_gpu = args.use_gpu)
+    gens = []
+    for device in ['0', '1']:
+        with tf.device('gpu:{}'.format(device)):
+            gens.append(MultiModalFeatureExtract(batch_size=args.batch_size, extract_youtube8m=args.extract_youtube8m,
+                                            extract_vggish=args.extract_vggish, extract_ocr=args.extract_ocr,
+                                            extract_asr=args.extract_asr, use_gpu=args.use_gpu, device='cudo:{}'.format(device)))
 
     file_paths = glob.glob(args.files_dir+'/*.'+args.postfix)
     random.shuffle(file_paths)
@@ -60,7 +65,8 @@ if __name__ == '__main__':
             vggish_path = os.path.join(vggish_folder, vid+'.npy')
             ocr_path = os.path.join(ocr_folder, vid+'.txt')
             asr_path = os.path.join(asr_folder, vid+'.txt')
-            ps.append(executor.submit(process_file, gen, file_path, youtube8m_path, vggish_path, ocr_path, asr_path))
+            t = random.randint(0, 1)
+            ps.append(executor.submit(process_file, gens[t], file_path, youtube8m_path, vggish_path, ocr_path, asr_path))
             #process_file(gen, file_path, video_path, audio_path, ocr_path, asr_path)
         for p in tqdm.tqdm(ps, total=len(ps), desc='feat extract'):
             p.result()
