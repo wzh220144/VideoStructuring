@@ -52,7 +52,7 @@ if __name__ == '__main__':
         with tf.device('gpu:{}'.format(device)):
             gens.append(MultiModalFeatureExtract(batch_size=args.batch_size, extract_youtube8m=args.extract_youtube8m,
                                             extract_vggish=args.extract_vggish, extract_ocr=args.extract_ocr,
-                                            extract_asr=args.extract_asr, use_gpu=args.use_gpu, device='cudo:{}'.format(device)))
+                                            extract_asr=args.extract_asr, use_gpu=args.use_gpu, device='cuda:{}'.format(device)))
 
     file_paths = glob.glob(args.files_dir+'/*.'+args.postfix)
     random.shuffle(file_paths)
