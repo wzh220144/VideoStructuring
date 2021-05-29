@@ -95,6 +95,7 @@ class MultiModalFeatureExtract(object):
                 index += 1
                 frames.add(cur_frame)
         frames.add(frame_count - 1)
+        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frames)))
 
         cur_frame = 0
         frame_all = []
@@ -106,11 +107,9 @@ class MultiModalFeatureExtract(object):
             if max_num_frames != -1 and cnt >= max_num_frames:
                 break
             if cur_frame in frames:
-                frame_all.append(frame[:, :, ::-1])
+                yield frame[:, :, ::-1]
                 cnt += 1
             cur_frame += 1
-        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frame_all)))
-        return frame_all
 
     def get_all_frames(self, filename):
         video_capture = cv2.VideoCapture()
@@ -118,14 +117,12 @@ class MultiModalFeatureExtract(object):
           print(sys.stderr, 'Error: Cannot open video file ' + filename)
           return
         frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        frame_all = []
+        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, frame_count))
         while True:
             has_frames, frame = video_capture.read()
             if not has_frames:
                 break
-            frame_all.append(frame[:, :, ::-1])
-        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frame_all)))
-        return frame_all
+            yield frame[:, :, ::-1]
 
     #等频率抽取n+1帧; 第一帧及最后一帧放入
     def get_frames_n_split(self, filename, n):
@@ -146,17 +143,15 @@ class MultiModalFeatureExtract(object):
                 break
             frames.add(cur_frame)
         frames.add(frame_count - 1)
-
+        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frames)))
         cur_frame = 0
         while True:
             has_frames, frame = video_capture.read()
             if not has_frames:
                 break
             if cur_frame in frames:
-                frame_all.append(frame[:, :, ::-1])
+                yield frame[:, :, ::-1]
             cur_frame += 1
-        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frame_all)))
-        return frame_all
 
     def extract_youtube8m_feat(self, feat_dict, test_file, youtube8m_path, save):
         if self.extract_youtube8m:
@@ -253,11 +248,22 @@ class MultiModalFeatureExtract(object):
             print("audio file not exists: {}".format(output_audio))
 
     def get_rgb_list(self, path, mode, n = None, every_ms = None, max_num_frames = None):
-        rgb_list = []
         if mode == 1:
-            rgb_list = self.get_frames_n_split(path, n)
+            return self.get_frames_n_split(path, n)
         elif mode == 2:
-            rgb_list = self.get_frames_same_interval(path, every_ms, max_num_frames)
+            return self.get_frames_same_interval(path, every_ms, max_num_frames)
         else:
-            rgb_list = self.get_all_frames(path)
-        return rgb_list
+            return self.get_all_frames(path)
+
+    def gen_batch(self, generator, batch_size):
+        batch = []
+        count = 0
+        for x in generator:
+            batch.append(count)
+            count += 1
+            if count == batch_size:
+                yield batch
+                batch = []
+                count = 0
+        if count > 0:
+            yield batch
