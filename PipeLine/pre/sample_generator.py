@@ -2,12 +2,10 @@
 
 import os
 import argparse
-import csv
 import json
-import random
 import cv2
-import glob
 import tqdm
+import random
 
 def read_video_info(cap):
     """获取视频相关信息"""
@@ -78,7 +76,26 @@ if __name__ == "__main__":
     parser.add_argument('--train_dir', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/videos/train_5k_A")
     parser.add_argument('--data_root', type = str, default = "/home/tione/notebook/VideoStructuring/dataset")
     parser.add_argument('--train_txt', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/structuring/GroundTruth/train5k.txt")
+    parser.add_argument('ratio', type = float, default=0.05)
     args = parser.parse_args()
     print(args)
 
+    scene_train_fs = open(args.data_root + '/scene_train', 'w')
+    scene_val_fs = open(args.data_root + '/scene_val', 'w')
+    tag_train_fs = open(args.data_root + '/tag_train', 'w')
+    tag_val_fs = open(args.data_root + '/tag_val', 'w')
     scene_list, tag_list = parse_annotation(args.train_txt, args.train_dir)
+    scene_list = random.shuffle(scene_list)
+    tag_list = random.shuffle(tag_list)
+    for x in scene_list:
+        p = random.random()
+        if p < args.ratio:
+            scene_val_fs.write('\t'.join([str(xx)for xx in x]) + '\n')
+        else:
+            scene_train_fs.write('\t'.join([str(xx) for xx in x]) + '\n')
+    for x in tag_list:
+        p = random.random()
+        if p < args.ratio:
+            tag_val_fs.write('\t'.join([str(xx)for xx in x]) + '\n')
+        else:
+            tag_train_fs.write('\t'.join([str(xx) for xx in x]) + '\n')
