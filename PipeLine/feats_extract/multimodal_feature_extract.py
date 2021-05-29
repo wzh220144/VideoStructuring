@@ -22,14 +22,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
 
 class MultiModalFeatureExtract(object):
 
-    def get_video_extractor(self, device, batch_size):
-        if VIDEO_EXTRACTOR == 'Youtube8M':
-            return YouTube8MFeatureExtractor(device, use_batch=batch_size != 1)
-        elif VIDEO_EXTRACTOR == 'FinetunedResnet101':
-            return FinetunedResnet101Extractor()
-        else:
-            raise NotImplementedError(VIDEO_EXTRACTOR)
-
     """docstring for ClassName"""
     def __init__(self, batch_size = 1,
                  extract_youtube8m = True,
@@ -48,8 +40,8 @@ class MultiModalFeatureExtract(object):
         #视频特征抽取模型
         if extract_youtube8m:
             self.youtube8m_extractors = [
-                    YouTube8MFeatureExtractor('cuda:0', use_batch = batch_size != 1),
-                    YouTube8MFeatureExtractor('cuda:1', use_batch = batch_size != 1)
+                    YouTube8MFeatureExtractor('0', use_batch = batch_size != 1),
+                    YouTube8MFeatureExtractor('1', use_batch = batch_size != 1)
                     ]
 
         #音频特征抽取模型
