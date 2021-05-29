@@ -261,7 +261,7 @@ class MultiModalFeatureExtract(object):
         batch = []
         count = 0
         for x in generator:
-            batch.append(count)
+            batch.append(x)
             count += 1
             if count == batch_size:
                 yield batch

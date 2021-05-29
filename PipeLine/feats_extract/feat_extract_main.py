@@ -31,7 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('--extract_youtube8m', type=bool, default=True)
     parser.add_argument('--extract_vggish', type=bool, default=True)
     parser.add_argument('--extract_asr', type=bool, default=False)
-    parser.add_argument('--max_worker', type=int, default=40)
+    parser.add_argument('--max_worker', type=int, default=10)
     parser.add_argument('--use_gpu', type=bool, default=True)
     args = parser.parse_args()
 
