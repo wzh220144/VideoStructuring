@@ -46,7 +46,10 @@ class MultiModalFeatureExtract(object):
 
         #视频特征抽取模型
         if extract_youtube8m:
-            self.youtube8m_extractor = YouTube8MFeatureExtractor('cuda', use_batch = batch_size != 1)
+            self.youtube8m_extractors = [
+                    YouTube8MFeatureExtractor('cuda:0', use_batch = batch_size != 1),
+                    YouTube8MFeatureExtractor('cuda:1', use_batch = batch_size != 1)
+                    ]
 
         #音频特征抽取模型
         if extract_vggish:
@@ -163,8 +166,8 @@ class MultiModalFeatureExtract(object):
                 feat_dict['youtube8m'] = np.load(youtube8m_path)
             else:
                 rgb_list = self.get_rgb_list(test_file, 3)
-                #t = random.randint(0,1)
-                feat_dict['youtube8m'] = self.youtube8m_extractor.extract_rgb_frame_features_list(rgb_list, self.batch_size)
+                t = random.randint(0,1)
+                feat_dict['youtube8m'] = self.youtube8m_extractors[t].extract_rgb_frame_features_list(rgb_list, self.batch_size)
             if save:
                 np.save(youtube8m_path, feat_dict['youtube8m'])
             end_time = time.time()
