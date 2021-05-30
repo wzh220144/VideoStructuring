@@ -8,16 +8,12 @@ import tqdm
 import random
 
 def read_video_info(cap):
-    """获取视频相关信息"""
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     fps = cap.get(cv2.CAP_PROP_FPS)
     return frame_count, fps, h, w
 
 def parse_annotation(train_txt, video_dir):
-    """
-    输出Scene边界的Timestamp
-    """
     with open(train_txt) as f:
         annotation_dict = json.loads(f.read())
     scene_list = []
