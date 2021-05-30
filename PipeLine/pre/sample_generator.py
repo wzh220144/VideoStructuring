@@ -81,27 +81,20 @@ def parse_label_id(path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_dir', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/videos/train_5k_A")
+    parser.add_argument('--test_dir', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/videos/test_5k_A")
     parser.add_argument('--data_root', type = str, default = "/home/tione/notebook/VideoStructuring/dataset")
     parser.add_argument('--train_txt', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/structuring/GroundTruth/train5k.txt")
     parser.add_argument('--label_id', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/label_id.txt')
-    parser.add_argument('--youtube8m_feat_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/feats/video')
+    parser.add_argument('--extract_youtube8m', type = bool, default = True)
     parser.add_argument('--fps', type = int, default = -1)
     args = parser.parse_args()
     print(args)
 
+    feats_dir = args.data_root + '/feats'
+    train_feats_dir = feats_dir + '/train_5k_A'
+    test_feats_dir = feats_dir + '/test_5k_A'
+
     scene_train_fs = open(args.data_root + '/scene_list', 'w')
     tag_train_fs = open(args.data_root + '/tag_list', 'w')
     label_id_dict = parse_label_id(args.label_id)
-    scene_list, tag_list = parse_annotation(args.train_txt, args.train_dir, label_id_dict, args.youtube8m_feat_dir, args.fps)
-    for x in scene_list:
-        p = random.random()
-        if p < args.ratio:
-            scene_val_fs.write('\t'.join([str(xx)for xx in x]) + '\n')
-        else:
-            scene_train_fs.write('\t'.join([str(xx) for xx in x]) + '\n')
-    for x in tag_list:
-        p = random.random()
-        if p < args.ratio:
-            tag_val_fs.write('\t'.join([str(xx)for xx in x]) + '\n')
-        else:
-            tag_train_fs.write('\t'.join([str(xx) for xx in x]) + '\n')
+    trai_scene_list, train_tag_list = parse_annotation(args.train_txt, args.train_dir, label_id_dict, args.youtube8m_feat_dir, args.fps)
