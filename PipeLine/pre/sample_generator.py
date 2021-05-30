@@ -14,7 +14,7 @@ def read_video_info(cap):
     fps = cap.get(cv2.CAP_PROP_FPS)
     return frame_count, fps, h, w
 
-def parse_annotation(train_txt, video_dir):
+def parse_annotation(train_txt, video_dir, label_id_dict):
     """
     输出Scene边界的Timestamp
     """
@@ -38,7 +38,8 @@ def parse_annotation(train_txt, video_dir):
         t2 = []
         for annotation in annotations:
             segment = annotation['segment']
-            labels = annotation['labels']
+            raw_labels = annotation['labels']
+            labels = [label_id_dict[x] for x in raw_labels]
             start_ts = segment[0]
             end_ts = segment[1]
             if start_ts > end_ts:
@@ -55,38 +56,47 @@ def parse_annotation(train_txt, video_dir):
                 if cur_ts >= end_ts:
                     scene_label = 1
                     status = 1
-                t1.append([video_id, annotation_index, frame_index, scene_label, labels, frame_count, fps, h, w])
+                t1.append([video_id, annotation_index, frame_index, scene_label, ','.join(raw_labels), ','.join(labels), frame_count, fps, h, w])
                 frame_index += 1
                 if status == 1:
                     break
             end_frame = frame_index
-            t2.append(video_id, annotation_index, start_frame, end_frame, labels, frame_count, fps, h, w)
+            t2.append([video_id, annotation_index, start_frame, end_frame, ','.join(raw_labels), ','.join(labels), frame_count, fps, h, w])
             annotation_index += 1
-        if flag:
+        if not flag:
             print('annotation of {} segment error.'.format(video_id))
             continue
         t1.pop()  #discard last frame
         scene_list.extend(t1)
         tag_list.extend(t2)
         cap.release()
+        if len(tag_list) > 10:
+            break
     return scene_list, tag_list
+
+def parse_label_id(path):
+    res = {}
+    with open(path, 'r') as fs:
+        for line in fs:
+            cols = line.strip('\n').split('\t')
+            res[cols[0]] = cols[1]
+    return res
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_dir', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/videos/train_5k_A")
     parser.add_argument('--data_root', type = str, default = "/home/tione/notebook/VideoStructuring/dataset")
     parser.add_argument('--train_txt', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/structuring/GroundTruth/train5k.txt")
-    parser.add_argument('ratio', type = float, default=0.05)
+    parser.add_argument('--label_id', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/label_id.txt')
+    parser.add_argument('--youtube8m_feat_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/feats/video')
+    parser.add_argument('--fps', type = int, default = -1)
     args = parser.parse_args()
     print(args)
 
-    scene_train_fs = open(args.data_root + '/scene_train', 'w')
-    scene_val_fs = open(args.data_root + '/scene_val', 'w')
-    tag_train_fs = open(args.data_root + '/tag_train', 'w')
-    tag_val_fs = open(args.data_root + '/tag_val', 'w')
-    scene_list, tag_list = parse_annotation(args.train_txt, args.train_dir)
-    scene_list = random.shuffle(scene_list)
-    tag_list = random.shuffle(tag_list)
+    scene_train_fs = open(args.data_root + '/scene_list', 'w')
+    tag_train_fs = open(args.data_root + '/tag_list', 'w')
+    label_id_dict = parse_label_id(args.label_id)
+    scene_list, tag_list = parse_annotation(args.train_txt, args.train_dir, label_id_dict, args.youtube8m_feat_dir, args.fps)
     for x in scene_list:
         p = random.random()
         if p < args.ratio:
