@@ -17,7 +17,7 @@ def process_file(gen, file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vg
         return
     try:
         print(file_path)
-        gen.extract_feat(file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir, split_dir, True)
+        gen.extract_feat(file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir, True)
     except Exception as e:
         print(file_path, traceback.format_exc())
 
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('--split_dir', default='/home/tione/notebook/dataset/structuring/split/train_5k_A')
     parser.add_argument('--extract_youtube8m', type=bool, default=True)
     parser.add_argument('--extract_resnet50', type=bool, default=False)
-    parser.add_argument('--extract_vggish', type=bool, default=True)
+    parser.add_argument('--extract_vggish', type=bool, default=False)
     parser.add_argument('--extract_stft', type=bool, default=True)
     parser.add_argument('--extract_asr', type=bool, default=False)
     parser.add_argument('--extract_ocr', type=bool, default=False)
@@ -90,4 +90,4 @@ if __name__ == '__main__':
         for p in tqdm.tqdm(ps, total=len(ps), desc='feat extract'):
             p.result()
             end_time = time.time()
-            print('cur cost: {} sec'.format(end_time - start_time))
+            #print('cur cost: {} sec'.format(end_time - start_time))

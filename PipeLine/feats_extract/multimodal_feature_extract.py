@@ -31,6 +31,7 @@ class MultiModalFeatureExtract(object):
                  device = 'cuda',
                  ):
         super(MultiModalFeatureExtract, self).__init__()
+        self.error_log = open('/home/tione/notebook/VideoStructuring/PipeLine/err.log', 'w')
         self.extract_youtube8m = extract_youtube8m
         self.extract_resnet50 = extract_resnet50
         self.extract_vggish = extract_vggish
@@ -91,19 +92,19 @@ class MultiModalFeatureExtract(object):
     def get_all_frames(self, frame_count):
         return range(frame_count)
 
-    def extract_youtube8m_feat(self, frames, video_file, youtube8m_dir, save):
+    def extract_youtube8m_feat(self, video_file, frames, youtube8m_dir, save):
         if self.extract_youtube8m:
             start_time = time.time()
             cap = cv2.VideoCapture(video_file)
-            for r_index, r_frame, r_time, count in self.gen_img_batch(cap, youtube8m_dir, frames, self.batch_size, 'extract youtube8m feat {}:'.format(video_file)):
+            for r_index, r_frame, r_time, count in self.gen_img_batch(cap, youtube8m_dir, frames, self.batch_size, 'extract youtube8m feat {}'.format(video_file)):
                 feats = self.youtube8m_extractor.extract_rgb_frame_features_list(r_frame, count)
                 if save:
                     for i in range(count):
-                        t = youtube8m_dir + str(r_index[i]) + '.npy'
+                        t = youtube8m_dir + '#' + str(r_index[i]) + '.npy'
                         np.save(t, feats[i])
             end_time = time.time()
             cap.release()
-            print("{}: youtube8m extract cost {} sec".format(video_file, end_time - start_time))
+            self.error_log.write("{}: youtube8m extract cost {} sec.\n".format(video_file, end_time - start_time))
 
     def _extract_vggish_feat(self, batch, feat_paths, save):
         res = self.audio_sess.run([self.embedding_tensor], feed_dict={self.features_tensor: batch})
@@ -120,11 +121,14 @@ class MultiModalFeatureExtract(object):
             for audio_file in split_audio_files:
                 feat_path = vggish_dir + audio_file.split("/")[-1].split('.')[0] + '.npy'
                 if os.path.exists(feat_path):
-                    print('{} exist.'.format(feat_path))
+                    self.error_log.write('{} exist.\n'.format(feat_path))
                     continue
-                batch.append(vggish_input.wavfile_to_examples(audio_file))
-                count += 1
-                feat_paths.append(feat_path)
+                try:
+                    batch.append(vggish_input.wavfile_to_examples(audio_file))
+                    count += 1
+                    feat_paths.append(feat_path)
+                except Exception as e:
+                    self.error_log.write("extract vggish from {} failed: {}\n".format(audio_file, e))
                 if count == self.batch_size:
                     self._extract_vggish_feat(batch, feat_paths, save)
                     feat_paths = []
@@ -133,21 +137,23 @@ class MultiModalFeatureExtract(object):
             if count > 0:
                 self._extract_vggish_feat(batch, feat_paths, save)
             end_time = time.time()
-            print("{}: vggish extract cost {} sec".format(video_file, end_time - start_time))
+            self.error_log.write("{}: vggish extract cost {} sec.\n".format(video_file, end_time - start_time))
 
-    def extract_ocr_feat(self, frames, video_file, ocr_dir, save):
+    def extract_ocr_feat(self, video_file, frames, ocr_dir, save):
         if self.extract_ocr:
             start_time = time.time()
             cap = cv2.VideoCapture(video_file)
             for r_index, r_frame, r_time, count in self.gen_img_batch(cap, ocr_dir, frames, self.batch_size, 'extract ocr feat {}:'.format(video_file)):
-                feats = self.youtube8m_extractor.extract_rgb_frame_features_list(r_frame, count)
+                feats = self.ocr_extractor.request(r_frame, count)
                 if save:
                     for i in range(count):
-                        t = os.path.join(ocr_dir, str(r_index[i]) + '.npy')
-                        np.save(t, feats[i])
+                        feat_path = ocr_dir + '#' + str(r_index[i]) + '.txt'
+                        t = feats[i]
+                        with open(feat_path, 'w') as fd:
+                            fd.write(t)
             end_time = time.time()
             cap.release()
-            print("{}: ocr extract cost {} sec".format(video_file, end_time - start_time))
+            self.error_log.write("{}: ocr extract cost {} sec.\n".format(video_file, end_time - start_time))
 
     def extract_asr_feat(self, video_file, split_audio_files, asr_dir, save):
         if self.extract_asr:
@@ -155,29 +161,36 @@ class MultiModalFeatureExtract(object):
             for audio_file in split_audio_files:
                 feat_path = asr_dir + audio_file.split("/")[-1].split('.')[0] + '.npy'
                 if os.path.exists(feat_path):
-                    print('{} exist.'.format(feat_path))
+                    self.error_log.write('{} exist.\n'.format(feat_path))
                     continue
                 t = self.asr_extractor.request(audio_file)
                 if save:
-                    np.save(t, feat_path)
+                    with open(feat_path, 'w') as fd:
+                        fd.write(t)
             end_time = time.time()
-            print("{}: asr extract cost {} sec".format(video_file, end_time - start_time))
+            self.error_log.write("{}: asr extract cost {} sec\n".format(video_file, end_time - start_time))
 
     def extract_stft_feat(self, video_file, split_audio_files, stft_dir, save):
         if self.extract_stft:
             start_time = time.time()
+            progress_bar = tqdm(total=len(split_audio_files), miniters=1, desc='extract stft feat {}'.format(video_file))
             for audio_file in split_audio_files:
+                progress_bar.update(1)
                 feat_path = stft_dir + audio_file.split("/")[-1].split('.')[0] + '.npy'
                 if os.path.exists(feat_path):
-                    print('{} exist.'.format(feat_path))
+                    self.error_log.write('{} exist.\n'.format(feat_path))
                     continue
-                t = self.stft_extractor.extract_stft(audio_file)
-                if save:
-                    np.save(t, feat_path)
+                try:
+                    t = self.stft_extractor.extract_stft(audio_file)
+                    if save:
+                        np.save(feat_path, t)
+                except Exception as e:
+                    self.error_log.write("extract vggish from {} failed: {}\n".format(audio_file, e))
             end_time = time.time()
-            print("{}: stft extract cost {} sec".format(video_file, end_time - start_time))
+            self.error_log.write("{}: stft extract cost {} sec.\n".format(video_file, end_time - start_time))
+            progress_bar.close()
 
-    def extrat_resnet50_feat(self, video_file, resnet50_dir, save):
+    def extrat_resnet50_feat(self, video_file, frames, resnet50_dir, save):
         if self.extract_resnet50:
             start_time = time.time()
             end_time = time.time()
@@ -199,17 +212,17 @@ class MultiModalFeatureExtract(object):
         cap.release()
 
         frames = self.get_frames_same_interval(frame_count, sample_fps)
-        print('{} has {} frames, sample {} frames.'.format(video_file, frame_count, len()))
+        #print('{} has {} frames, sample {} frames.'.format(video_file, frame_count, len(frames)))
 
         audio_file = video_file.replace('.mp4', '.wav')
         self.trans2audio(video_file, audio_file)
         split_audio_files = self.split_audio(video_file, audio_file, frames, split_dir)
 
-        self.extract_youtube8m_feat(video_file, youtube8m_dir, save)
-        self.extrat_resnet50_feat(video_file, resnet50_dir, save)
+        self.extract_youtube8m_feat(video_file, frames, youtube8m_dir, save)
+        self.extrat_resnet50_feat(video_file, frames, resnet50_dir, save)
         self.extract_vggish_feat(video_file, split_audio_files, vggish_dir, save)
         self.extract_stft_feat(video_file, split_audio_files, stft_dir, save)
-        self.extract_ocr_feat(video_file, ocr_dir, save)
+        self.extract_ocr_feat(video_file, frames, ocr_dir, save)
         self.extract_asr_feat(video_file, split_audio_files, asr_dir, save)
 
     def split_audio(self, video_file, audio_file, frames, split_audio_dir):
@@ -219,18 +232,17 @@ class MultiModalFeatureExtract(object):
         max_len = len(seg)
         res = []
         for pre_index, cur_index, pre, cur in self.gen_ts_interval(cap, frames, 'split audio {}:'.format(audio_file)):
-            split_audio_file = '{}/{}%{}#{}.wav'.format(split_audio_dir, video_id, pre_index, cur_index)
+            split_audio_file = '{}/{}#{}#{}.wav'.format(split_audio_dir, video_id, pre_index, cur_index)
             res.append(split_audio_file)
             if not os.path.exists(split_audio_file):
                 seg[int(pre): min(int(cur), max_len)].export(split_audio_file, format='wav')
-                print("audio file not exists: {}".format(split_audio_file))
+                #print("audio file not exists: {}".format(split_audio_file))
         return res
 
     def trans2audio(self, video_file, audio_file):
         if not os.path.exists(audio_file):
             command = 'ffmpeg -loglevel error -i '+ video_file + ' ' + audio_file
             os.system(command)
-            print("audio file not exists: {}".format(audio_file))
 
     def gen_img_batch(self, cap, feat_dir, frames, batch_size, desc):
         r_frame = []
@@ -248,8 +260,9 @@ class MultiModalFeatureExtract(object):
                 t = feat_dir + str(index) + '.npy'
                 if not os.path.exists(t):
                     r_index.append(index)
-                    r_frame.append(frames)
+                    r_frame.append(frame)
                     r_time.append(ts)
+                    progress_bar.update(1)
                     count += 1
             if count == batch_size:
                 yield r_index, r_frame, r_time, count
@@ -257,16 +270,14 @@ class MultiModalFeatureExtract(object):
                 r_index = []
                 r_frame = []
                 r_time = []
-                progress_bar.update(count)
             index += 1
         if count > 0:
             yield r_index, r_frame, r_time, count
-        progress_bar.update(count)
         progress_bar.close()
 
     def gen_ts_interval(self, cap, frames, desc):
         count = 0
-        progress_bar = tqdm(total=len(frames), miniters=1, desc=desc)
+        #progress_bar = tqdm(total=len(frames), miniters=1, desc=desc)
         has_frame, frame = cap.read()
         if not has_frame:
             return
@@ -284,6 +295,6 @@ class MultiModalFeatureExtract(object):
                 count += 1
                 pre = cur
                 pre_index = cur_index
-                progress_bar.update(count)
-        progress_bar.update(count)
-        progress_bar.close()
+                #progress_bar.update(count)
+        #progress_bar.update(count)
+        #progress_bar.close()

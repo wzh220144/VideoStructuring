@@ -10,7 +10,7 @@ class StftExtractor:
 	def extract_stft(self, audio_path):
 		k = 3  # sample episode num
 		time_unit = 3  # unit: second
-		data, fs = librosa.core.load(osp.join(audio_path, sr=1600))
+		data, fs = librosa.core.load(audio_path, sr=16000)
 		mean = (data.max() + data.min()) / 2
 		span = (data.max() - data.min()) / 2
 		if span < 1e-6:
