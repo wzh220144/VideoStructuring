@@ -1,23 +1,20 @@
 from __future__ import unicode_literals
-import sys,os
+import os
 import numpy as np
 import cv2
 import time
 import tensorflow as tf
-import json
-import traceback
-import random
 from tqdm import tqdm
 
 from feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeatureExtractor
-from feats_extract.imgfeat_extractor.finetuned_resnet101 import FinetunedResnet101Extractor
+from feats_extract.audio_extractor.stft_extractor import StftExtractor
 from feats_extract.txt_extractor.text_requests import VideoASR,VideoOCR
 from feats_extract.audio_extractor import vggish_input,vggish_params,vggish_postprocess,vggish_slim
+from pydub import AudioSegment
 
 BASE = "/home/tione/notebook/VideoStructuring"
 PCA_PARAMS_PATH = BASE + "/pretrained/vggfish/vggish_pca_params.npz"
 VGGISH_CHECKPOINT_PATH = BASE + "/pretrained/vggfish/vggish_model.ckpt"
-VIDEO_EXTRACTOR = 'Youtube8M'
 os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
 
 class MultiModalFeatureExtract(object):
@@ -25,7 +22,9 @@ class MultiModalFeatureExtract(object):
     """docstring for ClassName"""
     def __init__(self, batch_size = 1,
                  extract_youtube8m = True,
+                 extract_resnet50 = True,
                  extract_vggish = True,
+                 extract_stft = True,
                  extract_ocr = True,
                  extract_asr = True,
                  use_gpu = True,
@@ -33,16 +32,19 @@ class MultiModalFeatureExtract(object):
                  ):
         super(MultiModalFeatureExtract, self).__init__()
         self.extract_youtube8m = extract_youtube8m
+        self.extract_resnet50 = extract_resnet50
         self.extract_vggish = extract_vggish
+        self.extract_stft = extract_stft
         self.extract_ocr = extract_ocr
         self.extract_asr = extract_asr
         self.batch_size = batch_size
 
-        #视频特征抽取模型
         if extract_youtube8m:
             self.youtube8m_extractor = YouTube8MFeatureExtractor(device, use_batch = batch_size != 1)
 
-        #音频特征抽取模型
+        if extract_resnet50:
+            pass
+
         if extract_vggish:
             self.pproc = vggish_postprocess.Postprocessor(PCA_PARAMS_PATH)  # audio pca
             self.audio_graph = tf.Graph()
@@ -56,209 +58,232 @@ class MultiModalFeatureExtract(object):
             self.features_tensor = self.audio_sess.graph.get_tensor_by_name(vggish_params.INPUT_TENSOR_NAME)
             self.embedding_tensor = self.audio_sess.graph.get_tensor_by_name(vggish_params.OUTPUT_TENSOR_NAME)
 
-        #OCR特征抽取模型
+        if extract_stft:
+            self.stft_extractor = StftExtractor()
+
         if extract_ocr:
             self.ocr_extractor = VideoOCR(use_gpu)
 
-        #ASR特征抽取模型
         if extract_asr:
             self.asr_extractor = VideoASR(use_gpu)
 
-    def get_frames_same_interval(self, filename, every_ms, max_num_frames):
-        video_capture = cv2.VideoCapture()
-        if not video_capture.open(filename):
-          print(sys.stderr, 'Error: Cannot open video file ' + filename)
-          return
-        frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        rate = int(video_capture.get(cv2.CAP_PROP_FPS))
-        step = 1000.0 / rate
+    def get_frames_same_interval(self, frame_count, interval):
         frames = set([])
         cur_frame = 0
-        frames.add(cur_frame)
-        cur = 0
-        index = 1
-        while True:
-            cur_frame += 1
-            cur += step
-            if cur_frame >= frame_count:
-                break
-            if cur >= index * every_ms:
-                index += 1
-                frames.add(cur_frame)
-        frames.add(frame_count - 1)
-        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frames)))
-
-        cur_frame = 0
-        frame_all = []
-        cnt = 0
-        while True:
-            has_frames, frame = video_capture.read()
-            if not has_frames:
-                break
-            if max_num_frames != -1 and cnt >= max_num_frames:
-                break
-            if cur_frame in frames:
-                yield frame[:, :, ::-1]
-                cnt += 1
-            cur_frame += 1
-
-    def get_all_frames(self, filename):
-        video_capture = cv2.VideoCapture()
-        if not video_capture.open(filename):
-          print(sys.stderr, 'Error: Cannot open video file ' + filename)
-          return
-        frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, frame_count))
-        progress_bar = tqdm(total=frame_count, unit='frame'.format(filename), miniters=1, desc="extract {}".format(filename))
-        while True:
-            has_frames, frame = video_capture.read()
-            if not has_frames:
-                break
-            progress_bar.update(1)
-            yield frame[:, :, ::-1]
-        progress_bar.close()
-
-    #等频率抽取n+1帧; 第一帧及最后一帧放入
-    def get_frames_n_split(self, filename, n):
-        video_capture = cv2.VideoCapture()
-        if not video_capture.open(filename):
-            print(sys.stderr, 'Error: Cannot open video file ' + filename)
-            return
-        frame_all = []
-        #得到所有要产生frames的对应频率
-        frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        step = frame_count // n
-        frames = set([])
-        cur_frame = 0
-        frames.add(cur_frame)
-        while True:
-            cur_frame += step
-            if cur_frame >= frame_count:
-                break
+        while cur_frame < frame_count:
             frames.add(cur_frame)
-        frames.add(frame_count - 1)
-        print('{} has {} frames, sample {} frames.'.format(filename, frame_count, len(frames)))
-        cur_frame = 0
-        while True:
-            has_frames, frame = video_capture.read()
-            if not has_frames:
-                break
-            if cur_frame in frames:
-                yield frame[:, :, ::-1]
-            cur_frame += 1
+            cur_frame += interval
+        if frame_count > 0:
+            frames.add(frame_count - 1)
+        return frames
 
-    def extract_youtube8m_feat(self, feat_dict, test_file, youtube8m_path, save):
+    def get_frames_n_split(self, frame_count, n):
+        step = min(frame_count // n, 1)
+        frames = set([])
+        cur_frame = 0
+        while cur_frame < frame_count:
+            frames.add(cur_frame)
+            cur_frame += step
+        if frame_count > 0:
+            frames.add(frame_count - 1)
+        return frames
+
+    def get_all_frames(self, frame_count):
+        return range(frame_count)
+
+    def extract_youtube8m_feat(self, frames, video_file, youtube8m_dir, save):
         if self.extract_youtube8m:
             start_time = time.time()
-            if youtube8m_path is not None and os.path.exists(youtube8m_path):
-                print(youtube8m_path + ' exist.')
-                feat_dict['youtube8m'] = np.load(youtube8m_path)
-            else:
-                feat_dict['youtube8m'] = []
-                for x in  self.gen_batch(self.get_rgb_list(test_file, 3), self.batch_size):
-                    feat_dict['youtube8m'].extend(self.youtube8m_extractor.extract_rgb_frame_features_list(x, self.batch_size))
-            if save:
-                np.save(youtube8m_path, feat_dict['youtube8m'])
+            cap = cv2.VideoCapture(video_file)
+            for r_index, r_frame, r_time, count in self.gen_img_batch(cap, youtube8m_dir, frames, self.batch_size, 'extract youtube8m feat {}:'.format(video_file)):
+                feats = self.youtube8m_extractor.extract_rgb_frame_features_list(r_frame, count)
+                if save:
+                    for i in range(count):
+                        t = youtube8m_dir + str(r_index[i]) + '.npy'
+                        np.save(t, feats[i])
             end_time = time.time()
-            print("{}: youtube8m extract cost {} sec".format(test_file, end_time - start_time))
-        return feat_dict
+            cap.release()
+            print("{}: youtube8m extract cost {} sec".format(video_file, end_time - start_time))
 
-    def extract_vggish_feat(self, feat_dict, test_file, vggish_path, save):
+    def _extract_vggish_feat(self, batch, feat_paths, save):
+        res = self.audio_sess.run([self.embedding_tensor], feed_dict={self.features_tensor: batch})
+        for i in range(len(batch)):
+            if save:
+                np.save(feat_paths[i], res[i])
+
+    def extract_vggish_feat(self, video_file, split_audio_files, vggish_dir, save):
         if self.extract_vggish:
             start_time = time.time()
-            if vggish_path is not None and os.path.exists(vggish_path):
-                print(vggish_path + ' exist.')
-                feat_dict['vggish'] = np.load(vggish_path)
-            else:
-                output_audio = test_file.replace('.mp4', '.wav')
-                self.trans2audio(test_file, output_audio)
-                if os.path.exists(output_audio):
-                    examples_batch = vggish_input.wavfile_to_examples(output_audio)
-                    [embedding_batch] = self.audio_sess.run([self.embedding_tensor],
-                                                            feed_dict={self.features_tensor: examples_batch})
-                    feat_dict['vggish'] = self.pproc.postprocess(embedding_batch)
-                    if save:
-                        np.save(vggish_path, feat_dict['vggish'])
-                else:
-                    feat_dict['vggish'] = []
+            batch = []
+            count = 0
+            feat_paths = []
+            for audio_file in split_audio_files:
+                feat_path = vggish_dir + audio_file.split("/")[-1].split('.')[0] + '.npy'
+                if os.path.exists(feat_path):
+                    print('{} exist.'.format(feat_path))
+                    continue
+                batch.append(vggish_input.wavfile_to_examples(audio_file))
+                count += 1
+                feat_paths.append(feat_path)
+                if count == self.batch_size:
+                    self._extract_vggish_feat(batch, feat_paths, save)
+                    feat_paths = []
+                    batch = []
+                    count = 0
+            if count > 0:
+                self._extract_vggish_feat(batch, feat_paths, save)
             end_time = time.time()
-            print("{}: vggish extract cost {} sec".format(test_file, end_time - start_time))
-        return feat_dict
+            print("{}: vggish extract cost {} sec".format(video_file, end_time - start_time))
 
-    def extract_ocr_feat(self, feat_dict, test_file, ocr_path, save):
+    def extract_ocr_feat(self, frames, video_file, ocr_dir, save):
         if self.extract_ocr:
             start_time = time.time()
-            if ocr_path is not None and os.path.exists(ocr_path):
-                print(ocr_path + ' exist.')
-                with open(ocr_path, 'r') as f:
-                    feat_dict['ocr'] = f.readline().strip('\n').split('\x001')
-            else:
-                feat_dict['ocr'] = []
-                for x in self.gen_batch(self.get_rgb_list(test_file, 3), self.batch_size):
-                    feat_dict['ocr'].extend(self.ocr_extractor.request(x))
+            cap = cv2.VideoCapture(video_file)
+            for r_index, r_frame, r_time, count in self.gen_img_batch(cap, ocr_dir, frames, self.batch_size, 'extract ocr feat {}:'.format(video_file)):
+                feats = self.youtube8m_extractor.extract_rgb_frame_features_list(r_frame, count)
                 if save:
-                    with open(ocr_path, 'w') as f:
-                        f.write('\x001'.join(feat_dict['ocr']))
+                    for i in range(count):
+                        t = os.path.join(ocr_dir, str(r_index[i]) + '.npy')
+                        np.save(t, feats[i])
             end_time = time.time()
-            print("{}: ocr extract cost {} sec".format(test_file, end_time - start_time))
-        return feat_dict
+            cap.release()
+            print("{}: ocr extract cost {} sec".format(video_file, end_time - start_time))
 
-    def extract_asr_feat(self, feat_dict, test_file, asr_path, save):
+    def extract_asr_feat(self, video_file, split_audio_files, asr_dir, save):
         if self.extract_asr:
             start_time = time.time()
-            if asr_path is not None and os.path.exists(asr_path):
-                print(asr_path + ' exist.')
-                with open(asr_path, 'r') as f:
-                    feat_dict['asr'] = f.readline().strip('\n').split('\x001')
-            else:
-                output_audio = test_file.replace('.mp4', '.wav')
-                video_asr = ''
-                self.trans2audio(test_file, output_audio)
-                if os.path.exists(output_audio):
-                    try:
-                        video_asr = self.asr_extractor.request(output_audio)
-                    except:
-                        print(output_audio)
-                        print(traceback.format_exc())
-                feat_dict['asr'] = video_asr
+            for audio_file in split_audio_files:
+                feat_path = asr_dir + audio_file.split("/")[-1].split('.')[0] + '.npy'
+                if os.path.exists(feat_path):
+                    print('{} exist.'.format(feat_path))
+                    continue
+                t = self.asr_extractor.request(audio_file)
                 if save:
-                    with open(asr_path, 'w') as f:
-                        f.write('\x001'.join(feat_dict['text']))
+                    np.save(t, feat_path)
             end_time = time.time()
-            print("{}: asr extract cost {} sec".format(test_file, end_time - start_time))
-        return feat_dict
+            print("{}: asr extract cost {} sec".format(video_file, end_time - start_time))
 
-    def extract_feat(self, test_file, youtube8m_path=None, vggish_path=None, ocr_path=None, asr_path=None, save=True):
-        feat_dict={}
-        feat_dict = self.extract_youtube8m_feat(feat_dict, test_file, youtube8m_path, save)
-        feat_dict = self.extract_vggish_feat(feat_dict, test_file, vggish_path, save)
-        feat_dict = self.extract_ocr_feat(feat_dict, test_file, ocr_path, save)
-        feat_dict = self.extract_asr_feat(feat_dict, test_file, asr_path, save)
-        return feat_dict
+    def extract_stft_feat(self, video_file, split_audio_files, stft_dir, save):
+        if self.extract_stft:
+            start_time = time.time()
+            for audio_file in split_audio_files:
+                feat_path = stft_dir + audio_file.split("/")[-1].split('.')[0] + '.npy'
+                if os.path.exists(feat_path):
+                    print('{} exist.'.format(feat_path))
+                    continue
+                t = self.stft_extractor.extract_stft(audio_file)
+                if save:
+                    np.save(t, feat_path)
+            end_time = time.time()
+            print("{}: stft extract cost {} sec".format(video_file, end_time - start_time))
 
-    def trans2audio(self, test_file, output_audio):
-        if not os.path.exists(output_audio):
-            command = 'ffmpeg -loglevel error -i '+ test_file + ' ' + output_audio
+    def extrat_resnet50_feat(self, video_file, resnet50_dir, save):
+        if self.extract_resnet50:
+            start_time = time.time()
+            end_time = time.time()
+            print("{}: resnet50 extract cost {} sec".format(video_file, end_time - start_time))
+
+    def read_video_info(self, cap):
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        return frame_count, fps, h, w
+
+    def extract_feat(self, video_file, split_dir, sample_fps,
+                     youtube8m_dir=None, resnet50_dir=None,
+                     vggish_dir=None, stft_dir=None,
+                     ocr_dir=None, asr_dir=None,
+                     save=True):
+        cap = cv2.VideoCapture(video_file)
+        frame_count, fps, h, w = self.read_video_info(cap)
+        cap.release()
+
+        frames = self.get_frames_same_interval(frame_count, sample_fps)
+        print('{} has {} frames, sample {} frames.'.format(video_file, frame_count, len()))
+
+        audio_file = video_file.replace('.mp4', '.wav')
+        self.trans2audio(video_file, audio_file)
+        split_audio_files = self.split_audio(video_file, audio_file, frames, split_dir)
+
+        self.extract_youtube8m_feat(video_file, youtube8m_dir, save)
+        self.extrat_resnet50_feat(video_file, resnet50_dir, save)
+        self.extract_vggish_feat(video_file, split_audio_files, vggish_dir, save)
+        self.extract_stft_feat(video_file, split_audio_files, stft_dir, save)
+        self.extract_ocr_feat(video_file, ocr_dir, save)
+        self.extract_asr_feat(video_file, split_audio_files, asr_dir, save)
+
+    def split_audio(self, video_file, audio_file, frames, split_audio_dir):
+        video_id = audio_file.split('/')[-1].split('.')[0]
+        cap = cv2.VideoCapture(video_file)
+        seg = AudioSegment.from_wav(audio_file)
+        max_len = len(seg)
+        res = []
+        for pre_index, cur_index, pre, cur in self.gen_ts_interval(cap, frames, 'split audio {}:'.format(audio_file)):
+            split_audio_file = '{}/{}%{}#{}.wav'.format(split_audio_dir, video_id, pre_index, cur_index)
+            res.append(split_audio_file)
+            if not os.path.exists(split_audio_file):
+                seg[int(pre): min(int(cur), max_len)].export(split_audio_file, format='wav')
+                print("audio file not exists: {}".format(split_audio_file))
+        return res
+
+    def trans2audio(self, video_file, audio_file):
+        if not os.path.exists(audio_file):
+            command = 'ffmpeg -loglevel error -i '+ video_file + ' ' + audio_file
             os.system(command)
-            print("audio file not exists: {}".format(output_audio))
+            print("audio file not exists: {}".format(audio_file))
 
-    def get_rgb_list(self, path, mode, n = None, every_ms = None, max_num_frames = None):
-        if mode == 1:
-            return self.get_frames_n_split(path, n)
-        elif mode == 2:
-            return self.get_frames_same_interval(path, every_ms, max_num_frames)
-        else:
-            return self.get_all_frames(path)
-
-    def gen_batch(self, generator, batch_size):
-        batch = []
+    def gen_img_batch(self, cap, feat_dir, frames, batch_size, desc):
+        r_frame = []
+        r_index = []
+        r_time = []
         count = 0
-        for x in generator:
-            batch.append(x)
-            count += 1
+        index = 0
+        progress_bar = tqdm(total=len(frames), miniters=1, desc=desc)
+        while True:
+            has_frame, frame = cap.read()
+            if not has_frame:
+                break
+            ts = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if index in frames:
+                t = feat_dir + str(index) + '.npy'
+                if not os.path.exists(t):
+                    r_index.append(index)
+                    r_frame.append(frames)
+                    r_time.append(ts)
+                    count += 1
             if count == batch_size:
-                yield batch
-                batch = []
+                yield r_index, r_frame, r_time, count
                 count = 0
+                r_index = []
+                r_frame = []
+                r_time = []
+                progress_bar.update(count)
+            index += 1
         if count > 0:
-            yield batch
+            yield r_index, r_frame, r_time, count
+        progress_bar.update(count)
+        progress_bar.close()
+
+    def gen_ts_interval(self, cap, frames, desc):
+        count = 0
+        progress_bar = tqdm(total=len(frames), miniters=1, desc=desc)
+        has_frame, frame = cap.read()
+        if not has_frame:
+            return
+        pre = 0
+        pre_index = 0
+        cur_index = 0
+        while True:
+            has_frame, frame = cap.read()
+            if not has_frame:
+                break
+            cur_index += 1
+            cur = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if cur_index in frames:
+                yield pre_index, cur_index, pre, cur
+                count += 1
+                pre = cur
+                pre_index = cur_index
+                progress_bar.update(count)
+        progress_bar.update(count)
+        progress_bar.close()
