@@ -10,6 +10,7 @@ from feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeature
 from feats_extract.audio_extractor.stft_extractor import StftExtractor
 from feats_extract.txt_extractor.text_requests import VideoASR,VideoOCR
 from feats_extract.audio_extractor import vggish_input,vggish_params,vggish_postprocess,vggish_slim
+from utils import utils
 from pydub import AudioSegment
 
 BASE = "/home/tione/notebook/VideoStructuring"
@@ -67,30 +68,6 @@ class MultiModalFeatureExtract(object):
 
         if extract_asr:
             self.asr_extractor = VideoASR(use_gpu)
-
-    def get_frames_same_interval(self, frame_count, interval):
-        frames = set([])
-        cur_frame = 0
-        while cur_frame < frame_count:
-            frames.add(cur_frame)
-            cur_frame += interval
-        if frame_count > 0:
-            frames.add(frame_count - 1)
-        return frames
-
-    def get_frames_n_split(self, frame_count, n):
-        step = min(frame_count // n, 1)
-        frames = set([])
-        cur_frame = 0
-        while cur_frame < frame_count:
-            frames.add(cur_frame)
-            cur_frame += step
-        if frame_count > 0:
-            frames.add(frame_count - 1)
-        return frames
-
-    def get_all_frames(self, frame_count):
-        return range(frame_count)
 
     def extract_youtube8m_feat(self, video_file, frames, youtube8m_dir, save):
         if self.extract_youtube8m:
@@ -176,7 +153,7 @@ class MultiModalFeatureExtract(object):
             progress_bar = tqdm(total=len(split_audio_files), miniters=1, desc='extract stft feat {}'.format(video_file))
             for audio_file in split_audio_files:
                 progress_bar.update(1)
-                feat_path = stft_dir + audio_file.split("/")[-1].split('.')[0] + '.npy'
+                feat_path = stft_dir + '.npy'
                 if os.path.exists(feat_path):
                     self.error_log.write('{} exist.\n'.format(feat_path))
                     continue
@@ -211,7 +188,7 @@ class MultiModalFeatureExtract(object):
         frame_count, fps, h, w = self.read_video_info(cap)
         cap.release()
 
-        frames = self.get_frames_same_interval(frame_count, sample_fps)
+        frames = utils.get_frames_same_interval(frame_count, sample_fps)
         #print('{} has {} frames, sample {} frames.'.format(video_file, frame_count, len(frames)))
 
         audio_file = video_file.replace('.mp4', '.wav')
