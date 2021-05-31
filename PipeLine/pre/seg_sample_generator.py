@@ -7,6 +7,7 @@ import cv2
 import tqdm
 import random
 from utils import utils
+import glob
 
 def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft):
     cap = cv2.VideoCapture(video_file)
@@ -25,7 +26,7 @@ def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extrac
         has_frame, frame = cap.read()
         if not has_frame:
             break
-        ts = cap.get(cv2.CAP_PROP_POS_MSEC)
+        ts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
         if cur_frame in frames:
             flag = True
             youtube8m_feat_path = ''
@@ -34,10 +35,12 @@ def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extrac
                 youtube8m_feat_path = os.path.join(youtube8m_feats_dir, '{}#{}.npy'.format(video_id, cur_frame))
                 if not os.path.exists(youtube8m_feat_path):
                     flag = False
+                youtube8m_feat_path = '#{}.npy'.format(cur_frame)
             if extract_stft:
-                stft_feat_path = os.path.join(stft_feats_dir, '{}{}#{}{}.npy'.format(video_id, video_id, cur_frame, cur_frame + fps))
+                stft_feat_path = os.path.join(stft_feats_dir, '{}{}#{}#{}.npy'.format(video_id, video_id, cur_frame, cur_frame + fps))
                 if not os.path.exists(stft_feat_path):
                     flag = False
+                stft_feat_path = '#{}#{}.npy'.format(cur_frame, cur_frame + fps)
             if not flag:
                 break
             info['index'].append(cur_frame)
@@ -51,12 +54,14 @@ def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extrac
     info['w'] = w
     info['h'] = h
     info['fps'] = fps
+    info['id'] = video_id
+    cap.release()
     return info
 
 def trans2id(labels, label_id_dict):
     res = []
     for label in labels:
-        res.append(label_id_dict[label])
+        res.append(int(label_id_dict[label]))
     return res
 
 def gen_labels(info, label_id_dict, video_annotation):
@@ -90,11 +95,15 @@ def gen_labels(info, label_id_dict, video_annotation):
                 if ts >= e:
                     info['label'].append(1)
                     annotation_index += 1
+                else:
+                    info['label'].append(0)
                 if annotation_index == len(annotations):
                     annotation_index = -1
                     t = i
                 if annotation_index != -1:
                     info['tag_label'].append(trans2id(annotations[annotation_index]['labels'], label_id_dict))
+                else:
+                    info['tag_label'].append([])
         if t != -1:
             for i in range(t, l):
                 info['label'][i] = 0    #最后一个场景没有切分点
@@ -105,18 +114,19 @@ def do_gen_samples(info, window_size):
     res = []
     for cur in range(1, l - 1): #第一个frame及最后一个frame不能作为准确sample
         sample = {}
-        b1 = list(range(max(0, cur - window_size), cur - 1))
-        b2 = list(range(cur, min(cur + window_size - 1, l - 1)))
+        b1 = list(range(max(0, cur - window_size), cur))
+        b2 = list(range(cur, min(cur + window_size, l)))
         while len(b1) < window_size:
             b1.append(cur - 1)
         while len(b2) < window_size:
             b2.append(l - 1)
         sample['index'] = cur
         sample['b1'] = {'youtube8m': [info['youtube8m'][x] for x in b1], 'stft': [info['stft'][x] for x in b1]}
-        sample['b2'] = {'youtube8m': [info['youtube8m'][x] for x in b1], 'stft': [info['stft'][x] for x in b1]}
+        sample['b2'] = {'youtube8m': [info['youtube8m'][x] for x in b2], 'stft': [info['stft'][x] for x in b2]}
         sample['label'] = info['label'][cur]
         sample['tag_label'] = info['tag_label'][cur]
         sample['ts'] = info['ts'][cur]
+        sample['id'] = info['id']
         res.append(sample)
     return res
 
@@ -124,16 +134,20 @@ def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, vid
     youtube8m_feats_dir = os.path.join(feats_dir, postfix, 'youtube8m')
     stft_feats_dir = os.path.join(feats_dir, postfix, 'stft')
     res = []
-    for name in os.listdir(os.path.join(video_dir, postfix)):
-        video_file = os.path.join(video_dir, postfix, name)
+    for video_file in glob.glob(os.path.join(args.video_dir, postfix, '*.mp4')):
+        print(video_file)
         info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
+        #print(info)
+        video_name = video_file.split('/')[-1]
         video_annotation = {}
-        if video_file in annotation_dict:
-            video_annotation = annotation_dict[video_file]
+        if video_name in annotation_dict:
+            video_annotation = annotation_dict[video_name]
         info, flag = gen_labels(info, label_id_dict, video_annotation)
+        #print(info)
         if not flag:
             continue
         samples = do_gen_samples(info, window_size)
+        #print(samples)
         res.extend(samples)
     return res
 
@@ -162,22 +176,17 @@ if __name__ == "__main__":
     parser.add_argument('--extract_stft', type = bool, default = True)
     parser.add_argument('--fps', type = int, default = 5)
     parser.add_argument('--ratio', type = float, default = 0.05)
-    parser.add_arugment('--samples_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/samples/seg')
-    parser.add_arugment('--seq_len', type = int, default = 5)
+    parser.add_argument('--samples_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/samples/seg')
+    parser.add_argument('--window_size', type = int, default = 5)
     args = parser.parse_args()
-    print(args)
-
-    train_feats_dir = os.path.join(args.feats_dir, args.train_postfix)
-    test_feats_dir = os.path.join(args.feats_dir, args.test_postfix)
 
     os.makedirs(args.samples_dir, exist_ok=True)
-    scene_test_fs = open(args.samples_dir + '/test', 'w')
     label_id_dict = parse_label_id(args.label_id)
-    annotation_dict = []
+    annotation_dict = {}
     with open(args.train_txt) as f:
         annotation_dict = json.loads(f.read())
     samples = gen_samples(annotation_dict, label_id_dict,
-                     args.fps, args.seq_len, train_feats_dir,
+                     args.fps, args.window_size, args.feats_dir,
                      args.video_dir, args.train_postfix,
                      args.extract_youtube8m, args.extract_stft)
     random.random(samples)
@@ -190,7 +199,7 @@ if __name__ == "__main__":
 
     '''
     samples = gen_samples({}, label_id_dict, 
-                     args.fps, args.seq_len, test_feats_dir,
+                     args.fps, args.seq_len, args.feats_dir,
                      args.video_dir, args.test_postfix,
                      args.extract_youtube8m, args.extract_stft)
     with open(args.samples_dir + '/test', 'w') as scene_test_fs:
