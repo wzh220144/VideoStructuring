@@ -109,10 +109,10 @@ class LGSSone(nn.Module):
         self.lstm_hidden_size = args.lstm_hidden_size
         if modal == "youtube8m":
             self.bnet = BNet(args)
-            self.input_dim = (args.youtube8m_feat_dim + args.sim_dim)
+            self.input_dim = (args.youtube8m_dim + args.sim_dim)
         elif modal == "stft":
             self.bnet = BNetSTFT(args)
-            self.input_dim = args.stft_feat_dim
+            self.input_dim = args.stft_dim
         else:
             pass
         self.lstm = nn.LSTM(input_size=self.input_dim,
@@ -167,8 +167,8 @@ class LGSS(nn.Module):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--samples_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/samples/seg')
-    parser.add_argument('--youtube8m_cache_size', type = int, default = 100000)
-    parser.add_argument('--stft_cache_size', type = int, default = 100000)
+    parser.add_argument('--youtube8m_cache_size', type = int, default = 1000000)
+    parser.add_argument('--stft_cache_size', type = int, default = 1000000)
     parser.add_argument('--batch_size', type = int, default = 32)
     parser.add_argument('--extract_youtube8m', type = bool, default = True)
     parser.add_argument('--extract_stft', type = bool, default = True)

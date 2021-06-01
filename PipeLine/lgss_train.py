@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 from dataset.seg_dataset import SegDataset
 import dataset.seg_dataset as seg_dataset
 import argparse
-from models.lgss import LGSS
+from models.lgss.lgss import LGSS
 import torch.nn as nn
 from utils.torch_utils import *
 from torch.optim.adam import Adam
@@ -13,6 +13,7 @@ from tensorboardX import SummaryWriter
 import torch.nn.functional as functional
 import numpy as np
 from sklearn.metrics import average_precision_score
+import tqdm
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
@@ -61,7 +62,8 @@ def get_mAP_seq(loader, gts_raw, preds_raw):
 def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, writer):
     global train_iter
     model.train()
-    for batch_idx, (youtube8m_data, stft_data, label) in enumerate(data_loader):
+    #for x in enumerate(data_loader):
+    for batch_idx, (youtube8m_data, stft_data, label) in enumerate(tqdm.tqdm(data_loader, total = len(data_loader))):
         label = label.view(-1)
         if args.use_gpu == 1:
             youtube8m_data = youtube8m_data.cuda()
@@ -83,7 +85,7 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, writ
             loss.item()))
     scheduler.step()
 
-def test(args, model, data_loader, criterion, writer, ):
+def test(args, model, data_loader, criterion, writer):
     global val_iter
     model.eval()
     val_loss = 0
@@ -147,23 +149,23 @@ def main():
     parser.add_argument('--resume', type = str, default = None)
     parser.add_argument('--samples_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/samples/seg')
     parser.add_argument('--model_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/model/seg')
-    parser.add_argument('--youtube8m_cache_size', type = int, default = 100000)
-    parser.add_argument('--stft_cache_size', type = int, default = 100000)
+    parser.add_argument('--feats_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/feats')
+    parser.add_argument('--youtube8m_cache_size', type = int, default = 1000000)
+    parser.add_argument('--stft_cache_size', type = int, default = 1000000)
     parser.add_argument('--batch_size', type = int, default = 32)
     parser.add_argument('--extract_youtube8m', type = bool, default = True)
     parser.add_argument('--extract_stft', type = bool, default = True)
     parser.add_argument('--youtube8m_ratio', type = float, default = 0.8)
     parser.add_argument('--stft_ratio', type = float, default = 0.2)
     parser.add_argument('--sim_dim', type = int, default = 512)
-    parser.add_argument('--youtube8m_dim', type = int, default = 2048)
+    parser.add_argument('--youtube8m_dim', type = int, default = 1024)
     parser.add_argument('--stft_dim', type = int, default = 512)
     parser.add_argument('--lstm_hidden_size', type = int, default = 512)
     parser.add_argument('--window_size', type = int, default = 5)
     parser.add_argument('--num_layers', type=int, default=1)
-    parser.add_argument('--youtube8m_feat_dim', type=int, default=2048)
     parser.add_argument('--bidirectional', type=bool, default=True)
     parser.add_argument('--stft_feat_dim', type=int, default=512)
-    parser.add_argument('--epoch', type=int, default=50)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--logs_dir', type=str, default='/home/tione/notebook/VideoStructuring/dataset/log/seg')
 
     args = parser.parse_args()
@@ -174,8 +176,8 @@ def main():
     train_samples_path = os.path.join(args.samples_dir, 'train')
     val_samples_path = os.path.join(args.samples_dir, 'test')
 
-    train_loader = DataLoader(SegDataset(train_samples_path), batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(SegDataset(val_samples_path), batch_size=args.batch_size, shuffle=False)
+    train_loader = DataLoader(SegDataset(train_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir), batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir), batch_size=args.batch_size, shuffle=False)
 
     model = LGSS(args)
     if args.use_gpu == 1:
@@ -185,22 +187,22 @@ def main():
         checkpoint = load_checkpoint(args.resume)
         model.load_state_dict(checkpoint['state_dict'])
 
-    optimizer = Adam(model.parameters(), lr = args.lr, weight_decay=args.weight_decay)
+    optimizer = Adam(model.parameters(), lr = 1e-3, weight_decay=5e-4)
     scheduler = MultiStepLR(optimizer, milestones = [10, 30])
     criterion = nn.CrossEntropyLoss(torch.Tensor([0.1, 1]))
     if args.use_gpu == 1:
         criterion = criterion.cuda()
 
     print("start training...")
-    os.makedirs(args.model_dir)
-    os.makedirs(args.logs_dir)
+    os.makedirs(args.model_dir, exist_ok=True)
+    os.makedirs(args.logs_dir, exist_ok=True)
 
     writer = SummaryWriter(logdir=args.logs_dir)
     max_ap = -1
     for epoch in range(args.epochs):
-        train(args, model, train_loader, optimizer, scheduler, epoch, criterion)
+        train(args, model, train_loader, optimizer, scheduler, epoch, criterion, writer)
         print("Val Acc")
-        ap = test(args, model, val_loader, criterion, mode='val')
+        ap = test(args, model, val_loader, criterion, writer)
         if ap > max_ap:
             is_best = True
             max_ap = ap

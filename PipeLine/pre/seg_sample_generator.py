@@ -8,6 +8,7 @@ import tqdm
 import random
 from utils import utils
 import glob
+import tqdm
 
 def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft):
     cap = cv2.VideoCapture(video_file)
@@ -134,8 +135,8 @@ def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, vid
     youtube8m_feats_dir = os.path.join(feats_dir, postfix, 'youtube8m')
     stft_feats_dir = os.path.join(feats_dir, postfix, 'stft')
     res = []
-    for video_file in glob.glob(os.path.join(args.video_dir, postfix, '*.mp4')):
-        print(video_file)
+    video_files = glob.glob(os.path.join(args.video_dir, postfix, '*.mp4'))
+    for video_file in tqdm.tqdm(video_files, total = len(video_files), desc = 'gen samples'):
         info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
         #print(info)
         video_name = video_file.split('/')[-1]
@@ -189,7 +190,7 @@ if __name__ == "__main__":
                      args.fps, args.window_size, args.feats_dir,
                      args.video_dir, args.train_postfix,
                      args.extract_youtube8m, args.extract_stft)
-    random.random(samples)
+    random.shuffle(samples)
     val_len = int(len(samples) * args.ratio)
     train_len = len(samples) - val_len
     with open(args.samples_dir + '/train', 'w') as scene_train_fs:
