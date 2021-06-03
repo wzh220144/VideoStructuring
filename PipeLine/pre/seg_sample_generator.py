@@ -9,6 +9,7 @@ import random
 from utils import utils
 import glob
 import tqdm
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft):
     cap = cv2.VideoCapture(video_file)
@@ -73,6 +74,7 @@ def gen_labels(info, label_id_dict, video_annotation):
     if len(video_annotation) == 0:
         for i in range(l):
             info['label'].append(0)
+            info['tag_label'].append([])
     else:
         annotations = video_annotation['annotations']
         annotation_index = 0
@@ -131,25 +133,30 @@ def do_gen_samples(info, window_size):
         res.append(sample)
     return res
 
+def _gen_samples(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict):
+    info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
+    #print(info)
+    video_name = video_file.split('/')[-1]
+    video_annotation = {}
+    if video_name in annotation_dict:
+        video_annotation = annotation_dict[video_name]
+    info, flag = gen_labels(info, label_id_dict, video_annotation)
+    #print(info)
+    if not flag:
+        return []
+    return do_gen_samples(info, window_size)
+
 def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, video_dir, postfix, extract_youtube8m, extract_stft):
     youtube8m_feats_dir = os.path.join(feats_dir, postfix, 'youtube8m')
     stft_feats_dir = os.path.join(feats_dir, postfix, 'stft')
-    res = []
     video_files = glob.glob(os.path.join(args.video_dir, postfix, '*.mp4'))
-    for video_file in tqdm.tqdm(video_files, total = len(video_files), desc = 'gen samples'):
-        info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
-        #print(info)
-        video_name = video_file.split('/')[-1]
-        video_annotation = {}
-        if video_name in annotation_dict:
-            video_annotation = annotation_dict[video_name]
-        info, flag = gen_labels(info, label_id_dict, video_annotation)
-        #print(info)
-        if not flag:
-            continue
-        samples = do_gen_samples(info, window_size)
-        #print(samples)
-        res.extend(samples)
+    ps = []
+    res = []
+    with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
+        for video_file in tqdm.tqdm(video_files, total = len(video_files), desc = 'send task to pool'):
+            ps.append(executor.submit(_gen_samples, video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
+        for p in tqdm.tqdm(ps, total = len(ps), desc = 'gen samples'):
+            res.extend(p.result())
     return res
 
 def parse_label_id(path):
@@ -179,31 +186,33 @@ if __name__ == "__main__":
     parser.add_argument('--ratio', type = float, default = 0.05)
     parser.add_argument('--samples_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/samples/seg')
     parser.add_argument('--window_size', type = int, default = 5)
+    parser.add_argument('--mode', type = int, default = 1)
+    parser.add_argument('--max_worker', type = int, default = 10)
     args = parser.parse_args()
 
     os.makedirs(args.samples_dir, exist_ok=True)
     label_id_dict = parse_label_id(args.label_id)
     annotation_dict = {}
-    with open(args.train_txt) as f:
-        annotation_dict = json.loads(f.read())
-    samples = gen_samples(annotation_dict, label_id_dict,
-                     args.fps, args.window_size, args.feats_dir,
-                     args.video_dir, args.train_postfix,
-                     args.extract_youtube8m, args.extract_stft)
-    random.shuffle(samples)
-    val_len = int(len(samples) * args.ratio)
-    train_len = len(samples) - val_len
-    with open(args.samples_dir + '/train', 'w') as scene_train_fs:
-        write_samples(samples[:train_len], scene_train_fs)
-    with open(args.samples_dir + '/val', 'w') as scene_val_fs:
-        write_samples(samples[train_len:], scene_val_fs)
-
-    '''
-    samples = gen_samples({}, label_id_dict, 
-                     args.fps, args.seq_len, args.feats_dir,
-                     args.video_dir, args.test_postfix,
-                     args.extract_youtube8m, args.extract_stft)
-    with open(args.samples_dir + '/test', 'w') as scene_test_fs:
-        write_samples(samples, scene_test_fs)
-    '''
+    
+    if args.mode == 1:
+        with open(args.train_txt) as f:
+            annotation_dict = json.loads(f.read())
+        samples = gen_samples(annotation_dict, label_id_dict,
+                         args.fps, args.window_size, args.feats_dir,
+                         args.video_dir, args.train_postfix,
+                         args.extract_youtube8m, args.extract_stft)
+        random.shuffle(samples)
+        val_len = int(len(samples) * args.ratio)
+        train_len = len(samples) - val_len
+        with open(args.samples_dir + '/train', 'w') as scene_train_fs:
+            write_samples(samples[:train_len], scene_train_fs)
+        with open(args.samples_dir + '/val', 'w') as scene_val_fs:
+            write_samples(samples[train_len:], scene_val_fs)
+    elif args.mode == 2:
+        samples = gen_samples({}, label_id_dict, 
+                         args.fps, args.window_size, args.feats_dir,
+                         args.video_dir, args.test_postfix,
+                         args.extract_youtube8m, args.extract_stft)
+        with open(args.samples_dir + '/test', 'w') as scene_test_fs:
+            write_samples(samples, scene_test_fs)
 
