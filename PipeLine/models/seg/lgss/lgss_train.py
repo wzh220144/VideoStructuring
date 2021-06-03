@@ -1,10 +1,8 @@
-import torch
-import os
 from torch.utils.data import DataLoader
 from dataset.seg_dataset import SegDataset
 import dataset.seg_dataset as seg_dataset
 import argparse
-from models.lgss.lgss import LGSS
+from models.seg.lgss.lgss import LGSS
 import torch.nn as nn
 from utils.torch_utils import *
 from torch.optim.adam import Adam

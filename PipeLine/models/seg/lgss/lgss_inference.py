@@ -1,13 +1,11 @@
-import torch
-import os
 from torch.utils.data import DataLoader
 from dataset.seg_dataset import SegDataset
 import argparse
-from models.lgss.lgss import LGSS
+from models.seg.lgss.lgss import LGSS
 import torch.nn as nn
 import glob
 from utils.torch_utils import *
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 import torch.nn.functional as functional
 import numpy as np
 import tqdm
