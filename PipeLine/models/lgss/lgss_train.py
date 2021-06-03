@@ -68,14 +68,18 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
     total_precision = 0.0
     total_recall = 0.0
     total_acc = 0.0
-    for batch_idx, (youtube8m_data, stft_data, label) in enumerate(tqdm.tqdm(data_loader, total = len(data_loader))):
+    for batch_idx, (youtube8m_data, stft_data, label, _, _, _) in enumerate(tqdm.tqdm(data_loader, total = len(data_loader))):
         label = label.view(-1)
         if args.use_gpu == 1:
             youtube8m_data = youtube8m_data.cuda()
             stft_data = stft_data.cuda()
             label = label.cuda()
         optimizer.zero_grad()
-        output = model(youtube8m_data, stft_data)
+        try:
+            output = model(youtube8m_data, stft_data)
+        except Exception as e:
+            print(e)
+            continue
         output = output.view(-1, 2)
         loss = criterion(output, label)
         loss.backward()
@@ -87,7 +91,7 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
 
         auc = 0
         try:
-            auc = sklearn.metrics.roc_auc_score(labels, probs)
+            auc = sklearn.metrics.roc_auc_score(label.cpu().numpy().tolist(), prob)
         except:
             auc = 1.0
         _label = label.cpu().detach().numpy().tolist()
@@ -120,7 +124,7 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
                 auc,
                 total_auc / (batch_idx + 1),
                 acc,
-                total_auc / (batch_idx + 1),
+                total_acc / (batch_idx + 1),
                 recall,
                 total_recall / (batch_idx + 1),
                 precision,

@@ -59,6 +59,8 @@ class SegDataset(Dataset):
         b1 = sample['b1']
         b2 = sample['b2']
         video_id = sample['id']
+        index = sample['index']
+        ts = sample['ts']
         if self.use_cache:
             youtube8m_feat = [torch.from_numpy(self.get_youtube8m_feat(video_id, x)) for x in b1['youtube8m'] + b2['youtube8m']]
             youtube8m_feat = torch.stack(youtube8m_feat).type(torch.FloatTensor)
@@ -69,7 +71,7 @@ class SegDataset(Dataset):
             youtube8m_feat = torch.stack(youtube8m_feat).type(torch.FloatTensor)
             stft_feat = [torch.from_numpy(self.get_stft_feat_without_cache(video_id, x)) for x in b1['stft'] + b2['stft']]
             stft_feat = torch.stack(stft_feat).type(torch.FloatTensor)
-        return youtube8m_feat, stft_feat, label
+        return youtube8m_feat, stft_feat, label, video_id, index, ts
 
     def get_youtube8m_feat_without_cache(self, video_id, index):
         feat_path = os.path.join(self.youtube8m_feats_dir, '{}{}'.format(video_id, index))
