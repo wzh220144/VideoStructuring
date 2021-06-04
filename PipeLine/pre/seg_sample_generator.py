@@ -210,7 +210,7 @@ if __name__ == "__main__":
     elif args.mode == 2:
         samples = gen_samples({}, label_id_dict, 
                          args.fps, args.window_size, args.feats_dir,
-                         args.video_dir, args.test_postfix,
+                         args.test_postfix,
                          args.extract_youtube8m, args.extract_stft)
         with open(args.samples_dir + '/test', 'w') as scene_test_fs:
             write_samples(samples, scene_test_fs)
