@@ -1,10 +1,8 @@
-import torch
-import os
 from torch.utils.data import DataLoader
 from dataset.seg_dataset import SegDataset
 import dataset.seg_dataset as seg_dataset
 import argparse
-from models.lgss.lgss import LGSS
+from models.seg.lgss.lgss import LGSS
 import torch.nn as nn
 from utils.torch_utils import *
 from torch.optim.adam import Adam
@@ -12,7 +10,6 @@ from torch.optim.lr_scheduler import MultiStepLR
 from tensorboardX import SummaryWriter
 import torch.nn.functional as functional
 import numpy as np
-from sklearn.metrics import average_precision_score
 import tqdm
 import sklearn
 
@@ -27,7 +24,7 @@ def get_ap(gts_raw, preds_raw):
         gts.extend(gt_raw.tolist())
     for pred_raw in preds_raw:
         preds.extend(pred_raw.tolist())
-    return average_precision_score(np.nan_to_num(gts), np.nan_to_num(preds))
+    return sklearn.metrics.average_precision_score(np.nan_to_num(gts), np.nan_to_num(preds))
 
 def get_mAP_seq(loader, gts_raw, preds_raw):
     mAP = []
@@ -68,6 +65,8 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
     total_precision = 0.0
     total_recall = 0.0
     total_acc = 0.0
+    total_ap = 0.0
+    total_f1 = 0.0
     for batch_idx, (youtube8m_data, stft_data, label, _, _, _) in enumerate(tqdm.tqdm(data_loader, total = len(data_loader))):
         label = label.view(-1)
         if args.use_gpu == 1:
@@ -96,13 +95,19 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
             auc = 1.0
         _label = label.cpu().detach().numpy().tolist()
         _pred = pred.tolist()
+        _prob = prob.tolist()
         acc = sklearn.metrics.accuracy_score(_label, _pred)
         recall = sklearn.metrics.recall_score(_label, _pred, zero_division=1)
         precision = sklearn.metrics.precision_score(_label, _pred, zero_division=1)
+        ap = sklearn.metrics.average_precision_score(_label, _prob)
+        f1 = sklearn.metrics.f1_score(_label, _pred)
+
         total_acc += acc
         total_recall += recall
         total_precision += precision
         total_auc += auc
+        total_ap += ap
+        total_f1 += f1
 
         writer.add_scalar('train/loss', total_loss / (batch_idx + 1), train_iter)
         writer.add_scalar('train/auc', total_auc / (batch_idx + 1), train_iter)
@@ -113,7 +118,9 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
             t = 'epoch {}: [{}/{} ({:.0f}%)]\t' + \
                 'cur loss: {:.6f}, avg loss: {:.6f}, cur auc: {:.6f}, avg auc: {:.6f},' + \
                 ' cur acc: {:.6f}, avg acc: {:.6f}, cur recall: {:.6f}, avg recall: {:.6f},' + \
-                ' cur precision: {:.6f}, avg precision: {:.6f}'
+                ' cur precision: {:.6f}, avg precision: {:.6f},' + \
+                ' cur ap: {:.6f}, avg ap: {:.6f},' + \
+                ' cur f1: {:.6f}, avg f1: {:.6f}'
             print(t.format(
                 epoch,
                 int(batch_idx * len(youtube8m_data)),
@@ -128,27 +135,26 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
                 recall,
                 total_recall / (batch_idx + 1),
                 precision,
-                total_precision / (batch_idx + 1)
+                total_precision / (batch_idx + 1),
+                ap,
+                total_ap / (batch_idx + 1),
+                f1,
+                total_f1 / (batch_idx + 1)
                 ))
-        if batch_idx % 300 == 0:
+        if batch_idx % 500 == 0:
             print('start val...')
-            ap = test(args, model, val_loader, criterion, writer, 100)
+            ap = test(args, model, val_loader, criterion, writer, 500)
             if ap > max_ap:
                 is_best = True
                 max_ap = ap
             else:
                 is_best = False
-            print('epoch {}: [{}/{} ({:.0f}%)]\tcur loss: {:.6f}, avg loss: {:.6f}, auc: {:.6f}, acc: {:.6f}, recall: {:.6f}, precision: {:.6f}, ap: {:.6f}, max_ap: {:6f}'.format(
+            print('epoch {}: [{}/{} ({:.0f}%)]\tcur app: {:.6f}, max_ap: {:.6f}'.format(
                 epoch,
                 int(batch_idx * len(youtube8m_data)),
                 len(data_loader.dataset),
                 100. * batch_idx / len(data_loader),
                 loss.item(),
-                total_loss / (batch_idx + 1),
-                auc,
-                acc,
-                recall,
-                precision,
                 ap,
                 max_ap
                 ))
