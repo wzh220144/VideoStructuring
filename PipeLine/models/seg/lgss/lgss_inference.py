@@ -10,6 +10,7 @@ import torch.nn.functional as functional
 import numpy as np
 import tqdm
 import sklearn
+import json
 
 def inference(args, model, data_loader, threshold):
     model.eval()
@@ -31,15 +32,32 @@ def inference(args, model, data_loader, threshold):
     return res
 
 def save(res, path):
+    obj = {}
+    sorted(res, key=lambda x: '{}\t{}'.format(x[0], x[1]))
     with open(path, 'w') as fs:
+        s = 0
+        e = 0
+        pre_video_id = ''
         for x in res:
-            video_id = x[0]
+            video_id = x[0] + '.mp4'
             index = x[1]
             ts = x[2]
             prob = x[3]
             predict = x[4]
             label = x[5]
-            fs.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(video_id, index, ts, prob, predict, label))
+            if video_id not in obj:
+                if pre_video_id != '':
+                    obj[pre_video_id]['annotations'].append({'segment': [s, e], 'labels': []})
+                obj[video_id] = {'annotations': []}
+                s = 0
+                e = 0
+            e = ts
+            if predict == 1:
+                obj[video_id]['annotations'].append({'segment': [s, e], 'labels': []})
+                s = e
+        if pre_video_id != '':
+            obj[pre_video_id]['annotations'].append({'segment': [s, e], 'labels': []})
+        json.dump(obj, fs)
 
 def val(res):
     probs = [x[3] for x in res]
