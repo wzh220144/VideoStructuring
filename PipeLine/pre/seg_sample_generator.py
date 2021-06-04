@@ -4,7 +4,6 @@ import os
 import argparse
 import json
 import cv2
-import tqdm
 import random
 from utils import utils
 import glob
@@ -133,7 +132,7 @@ def do_gen_samples(info, window_size):
         res.append(sample)
     return res
 
-def _gen_samples(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict):
+def _gen_samples(video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict):
     info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
     #print(info)
     video_name = video_file.split('/')[-1]
@@ -146,7 +145,7 @@ def _gen_samples(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_y
         return []
     return do_gen_samples(info, window_size)
 
-def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, video_dir, postfix, extract_youtube8m, extract_stft):
+def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, postfix, extract_youtube8m, extract_stft):
     youtube8m_feats_dir = os.path.join(feats_dir, postfix, 'youtube8m')
     stft_feats_dir = os.path.join(feats_dir, postfix, 'stft')
     video_files = glob.glob(os.path.join(args.video_dir, postfix, '*.mp4'))
@@ -154,7 +153,7 @@ def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, vid
     res = []
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
         for video_file in tqdm.tqdm(video_files, total = len(video_files), desc = 'send task to pool'):
-            ps.append(executor.submit(_gen_samples, video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
+            ps.append(executor.submit(_gen_samples, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
         for p in tqdm.tqdm(ps, total = len(ps), desc = 'gen samples'):
             res.extend(p.result())
     return res
@@ -199,7 +198,7 @@ if __name__ == "__main__":
             annotation_dict = json.loads(f.read())
         samples = gen_samples(annotation_dict, label_id_dict,
                          args.fps, args.window_size, args.feats_dir,
-                         args.video_dir, args.train_postfix,
+                         args.train_postfix,
                          args.extract_youtube8m, args.extract_stft)
         random.shuffle(samples)
         val_len = int(len(samples) * args.ratio)
