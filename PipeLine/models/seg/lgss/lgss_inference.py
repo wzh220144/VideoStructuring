@@ -60,12 +60,13 @@ def gen_batch(data_loader, executor, args, threshold):
 
 def save(res, path):
     obj = {}
-    res = sorted(res, key=lambda x: '{}\t{}'.format(x[0], x[1]))
+    res = sorted(res, key=lambda x: (x[0], x[1]))
     with open(path, 'w') as fs:
         s = 0
         e = 0
         pre_video_id = ''
         for x in res:
+            print(x)
             video_id = x[0] + '.mp4'
             index = x[1]
             ts = x[2]
@@ -82,6 +83,7 @@ def save(res, path):
             if predict == 1:
                 obj[video_id]['annotations'].append({'segment': [s, e], 'labels': []})
                 s = e
+            pre_video_id = video_id
         if pre_video_id != '':
             obj[pre_video_id]['annotations'].append({'segment': [s, e], 'labels': []})
         json.dump(obj, fs)
@@ -126,9 +128,9 @@ def run(args, model):
         shuffle=False)
 
     print('start val...')
-    res = inference(args, model, val_loader, 0.6)
-    save(res, os.path.join(args.result_dir, 'val'))
-    val(res)
+    #res = inference(args, model, val_loader, 0.6)
+    #save(res, os.path.join(args.result_dir, 'val'))
+    #val(res)
 
     print('start inference...')
     res = inference(args, model, test_loader, 0.6)
