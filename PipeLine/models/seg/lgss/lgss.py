@@ -56,8 +56,10 @@ class Cos(nn.Module):
         x = x.view(-1, 1, x.shape[1], x.shape[2])
         part1, part2 = torch.split(x, [self.window_size] * 2, dim=2)
         #batch_size, sim_dim, window_size, feat_dim
-        part1 = self.conv1(part1).squeeze()
-        part2 = self.conv1(part2).squeeze()
+        part1 = self.conv1(part1)
+        part1 = part1.view(part1.shape[0], part1.shape[1], part1.shape[3])
+        part2 = self.conv1(part2)
+        part2 = part2.view(part2.shape[0], part2.shape[1], part2.shape[3])
         x = F.cosine_similarity(part1, part2, dim=2)  # batch_size, sim_dim
         return x
 
@@ -74,7 +76,7 @@ class BNet(nn.Module):
         context = x.view(-1, 1, x.shape[1], x.shape[2])
         context = self.conv1(context)  # batch_size, sim_dim, 1, feat_dim
         context = self.max3d(context)  # batch_size, 1,1,feat_dim
-        context = context.squeeze()
+        context = context.view(context.shape[0], context.shape[-1])
         sim = self.cos(x)
         bound = torch.cat((context, sim), dim=1)
         return bound
@@ -94,8 +96,10 @@ class BNetSTFT(nn.Module):
         context = self.stft_net(context)
         context = context.view(x.shape[0], 1, self.window_size * 2, -1)
         part1, part2 = torch.split(context, [self.window_size] * 2, dim=2)
-        part1 = self.conv2(part1).squeeze()
-        part2 = self.conv2(part2).squeeze()
+        part1 = self.conv2(part1)
+        part1 = part1.view(part1.shape[0], part1.shape[1], part1.shape[3])
+        part2 = self.conv2(part2)
+        part2 = part2.view(part2.shape[0], part2.shape[1], part2.shape[3])
         sim = F.cosine_similarity(part1, part2, dim=2)
         bound = sim
         return bound

@@ -10,30 +10,57 @@ import torch.nn.functional as functional
 import numpy as np
 import tqdm
 import sklearn
+import sklearn.metrics
 import json
+
+def _inference(args, model, data_youtube8m, data_stft, threshold, video_id, index, ts, label):
+    if args.use_gpu == 1:
+        try:
+            data_youtube8m = data_youtube8m.cuda()
+            data_stft = data_stft.cuda()
+        except Exception as e:
+            print(e)
+            return []
+    output = model(data_youtube8m, data_stft)
+    output = output.view(-1, 2)
+    output = functional.softmax(output, dim=1)
+    probs = output[:, 1].cpu().detach().numpy()
+    predicts = np.nan_to_num(probs > threshold).tolist()
+    probs = probs.tolist()
+    res = []
+    for i in range(len(label)):
+        res.append([video_id[i], index[i], ts[i], probs[i], predicts[i], label[i]])
+    return res
 
 def inference(args, model, data_loader, threshold):
     model.eval()
     res = []
     with torch.no_grad():
-        for data_youtube8m, data_stft, label, video_id, index, ts in tqdm.tqdm(data_loader, total = len(data_loader), desc='inference'):
-            if args.use_gpu == 1:
-                data_youtube8m = data_youtube8m.cuda()
-                data_stft = data_stft.cuda()
+        with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
+            for ps in gen_batch(data_loader, executor, args, threshold):
+                for p in ps:
+                    t = p.result()
+                    res.extend(t)
 
-            output = model(data_youtube8m, data_stft)
-            output = output.view(-1, 2)
-
-            output = functional.softmax(output, dim=1)
-            probs = output[:, 1].cpu().detach().numpy()
-            predicts = np.nan_to_num(probs > threshold).tolist()
-            probs = probs.tolist()
-            res.append([video_id[0], index[0], ts[0], probs[0], predicts[0], label.cpu().detach().numpy().tolist()[0]])
     return res
+
+def gen_batch(data_loader, executor, args, threshold):
+    cnt = 0
+    ps = []
+    for data_youtube8m, data_stft, label, video_id, index, ts in tqdm.tqdm(data_loader, total = len(data_loader)):
+        cnt += 1
+        ps.append(executor.submit(_inference, args, model,
+            data_youtube8m, data_stft, threshold,
+            video_id, index.numpy().tolist(), ts.numpy().tolist(), label.numpy().tolist()))
+        if cnt % args.max_worker == 0:
+            yield ps
+            ps = []
+    if cnt > 0:
+        yield ps
 
 def save(res, path):
     obj = {}
-    sorted(res, key=lambda x: '{}\t{}'.format(x[0], x[1]))
+    res = sorted(res, key=lambda x: '{}\t{}'.format(x[0], x[1]))
     with open(path, 'w') as fs:
         s = 0
         e = 0
@@ -76,33 +103,35 @@ def load_model(args):
     if args.use_gpu == 1:
         model = model.cuda()
     model = nn.DataParallel(model)
-    checkpoint = load_checkpoint(os.path.join(args.model_dir, 'model_best.pth.tar'), args.use_gpu)
+    checkpoint = load_checkpoint(os.path.join(args.model_dir, 'model_best.pth.tar'), args)
     model.load_state_dict(checkpoint['state_dict'])
     return model
 
-def run(args, model, video_name):
+def run(args, model):
     test_samples_path = os.path.join(args.samples_dir, 'test')
     val_samples_path = os.path.join(args.samples_dir, 'val')
 
     val_loader = DataLoader(
-        SegDataset(test_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False),
-        num_workers=10,
+        SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False),
+        num_workers=5,
         prefetch_factor=100,
-        batch_size=1,
-        shuffle=True)
-
-    test_loader = DataLoader(
-        SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'test_5k_A', args.feats_dir, False),
-        num_workers=10,
-        prefetch_factor=100,
-        batch_size=1,
+        batch_size=10,
         shuffle=False)
 
-    res = inference(args, model, val_loader)
+    test_loader = DataLoader(
+        SegDataset(test_samples_path, args.extract_youtube8m, args.extract_stft, 'test_5k_A', args.feats_dir, False),
+        num_workers=5,
+        prefetch_factor=100,
+        batch_size=10,
+        shuffle=False)
+
+    print('start val...')
+    res = inference(args, model, val_loader, 0.6)
     save(res, os.path.join(args.result_dir, 'val'))
     val(res)
 
-    res = inference(args, model, test_loader)
+    print('start inference...')
+    res = inference(args, model, test_loader, 0.6)
     save(res, os.path.join(args.result_dir, 'test'))
 
 if __name__ == '__main__':
@@ -129,19 +158,13 @@ if __name__ == '__main__':
     parser.add_argument('--stft_feat_dim', type=int, default=512)
     parser.add_argument('--logs_dir', type=str, default='/home/tione/notebook/VideoStructuring/dataset/log/seg')
     parser.add_argument('--result_dir', type=str, default='/home/tione/notebook/VideoStructuring/dataset/result/seg')
+    parser.add_argument('--max_worker', type=str, default=10)
 
     args = parser.parse_args()
-    os.makedirs(args.result_dir)
+    os.makedirs(args.result_dir, exist_ok=True)
     if args.use_gpu == 1:
         os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
 
     print('load model')
     model = load_model(args)
-
-    results = []
-    with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
-        for video_path in glob.glob(os.path.join(args.video_dir, '*.mp4')):
-            video_name = os.path.basename(video_path).split(".m")[0]
-            results.append(executor.submit(args, run, model, video_name))
-        results = [res.result() for res in results]
-    print('done')
+    run(args, model)

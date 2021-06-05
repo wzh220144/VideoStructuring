@@ -26,9 +26,13 @@ def save_checkpoint(state, is_best, fpath='checkpoint.pth.tar'):
     if is_best:
         shutil.copy(fpath, osp.join(osp.dirname(fpath), 'model_best.pth.tar'))
 
-def load_checkpoint(fpath):
+def load_checkpoint(fpath, args):
     if osp.isfile(fpath):
-        checkpoint = torch.load(fpath)
+        checkpoint = None
+        if args.use_gpu == 1:
+            checkpoint = torch.load(fpath)
+        else:
+            checkpoint = torch.load(fpath, map_location=torch.device('cpu'))
         print("=> Loaded checkpoint '{}'".format(fpath))
         return checkpoint
     else:
