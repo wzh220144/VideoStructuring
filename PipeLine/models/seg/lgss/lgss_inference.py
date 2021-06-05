@@ -66,7 +66,6 @@ def save(res, path):
         e = 0
         pre_video_id = ''
         for x in res:
-            print(x)
             video_id = x[0] + '.mp4'
             index = x[1]
             ts = x[2]
@@ -88,9 +87,9 @@ def save(res, path):
             obj[pre_video_id]['annotations'].append({'segment': [s, e], 'labels': []})
         json.dump(obj, fs)
 
-def val(res):
+def val(res, threshold):
     probs = [x[3] for x in res]
-    predicts = [x[4] for x in res]
+    predicts = [1 if x[3] > threshold else 0 for x in res]
     labels = [x[5] for x in res]
     auc = sklearn.metrics.roc_auc_score(labels, probs)
     acc = sklearn.metrics.accuracy_score(labels, predicts)
@@ -98,14 +97,15 @@ def val(res):
     precision = sklearn.metrics.precision_score(labels, predicts)
     ap = sklearn.metrics.average_precision_score(labels, probs)
     f1 = sklearn.metrics.f1_score(labels, predicts)
-    print('auc: {}, acc: {}, recall: {}, precision: {}, ap: {}, f1: {}'.format(auc, acc, recall, precision, ap, f1))
+    print('threshold: {}, auc: {}, acc: {}, recall: {}, precision: {}, ap: {}, f1: {}'.format(threshold, auc, acc, recall, precision, ap, f1))
 
 def load_model(args):
     model = LGSS(args)
     if args.use_gpu == 1:
         model = model.cuda()
     model = nn.DataParallel(model)
-    checkpoint = load_checkpoint(os.path.join(args.model_dir, 'model_best.pth.tar'), args)
+    #checkpoint = load_checkpoint(os.path.join(args.model_dir, 'model_best.pth.tar'), args)
+    checkpoint = load_checkpoint(os.path.join(args.model_dir, 'checkpoint.pth.tar'), args)
     model.load_state_dict(checkpoint['state_dict'])
     return model
 
@@ -117,23 +117,26 @@ def run(args, model):
         SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False),
         num_workers=5,
         prefetch_factor=100,
-        batch_size=10,
+        batch_size=20,
         shuffle=False)
 
     test_loader = DataLoader(
         SegDataset(test_samples_path, args.extract_youtube8m, args.extract_stft, 'test_5k_A', args.feats_dir, False),
         num_workers=5,
         prefetch_factor=100,
-        batch_size=10,
+        batch_size=20,
         shuffle=False)
 
+    '''
     print('start val...')
-    #res = inference(args, model, val_loader, 0.6)
-    #save(res, os.path.join(args.result_dir, 'val'))
-    #val(res)
+    res = inference(args, model, val_loader, 0.55)
+    save(res, os.path.join(args.result_dir, 'val'))
+    for threshold in np.arange(0, 1.05, 0.05).tolist():
+        val(res, threshold)
+    '''
 
     print('start inference...')
-    res = inference(args, model, test_loader, 0.6)
+    res = inference(args, model, test_loader, 0.7)
     save(res, os.path.join(args.result_dir, 'test'))
 
 if __name__ == '__main__':
