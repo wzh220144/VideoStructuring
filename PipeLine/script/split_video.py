@@ -11,7 +11,7 @@ def read_video_info(video_file):
     cap.release()
     return frame_count
 
-def _split_video(video_path, target_path, t1, t2)
+def _split_video(video_path, target_path, t1, t2):
     os.system('ffmpeg -y -i {} -strict -2 -ss {:.2f} -to {:.2f} {}'.format(video_path, t1, t2, target_path))
 
 def split_video(video_dir, result_dir, split_dir, postfix, args):
