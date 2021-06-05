@@ -110,8 +110,8 @@ def load_model(args):
     return model
 
 def run(args, model):
-    test_samples_path = os.path.join(args.samples_dir, 'test')
-    val_samples_path = os.path.join(args.samples_dir, 'val')
+    test_samples_path = os.path.join(args.samples_dir, args.test_postfix)
+    val_samples_path = os.path.join(args.samples_dir, args.train_postfix)
 
     val_loader = DataLoader(
         SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False),
@@ -163,7 +163,9 @@ if __name__ == '__main__':
     parser.add_argument('--stft_feat_dim', type=int, default=512)
     parser.add_argument('--logs_dir', type=str, default='/home/tione/notebook/VideoStructuring/dataset/log/seg')
     parser.add_argument('--result_dir', type=str, default='/home/tione/notebook/VideoStructuring/dataset/result/seg')
-    parser.add_argument('--max_worker', type=str, default=10)
+    parser.add_argument('--max_worker', type=int, default=10)
+    parser.add_argument('--train_postfix', type=str, default='train_5k_A')
+    parser.add_argument('--test_postfix', type=str, default='test_5k_A')
 
     args = parser.parse_args()
     os.makedirs(args.result_dir, exist_ok=True)

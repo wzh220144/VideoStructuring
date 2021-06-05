@@ -184,6 +184,7 @@ if __name__ == "__main__":
     parser.add_argument('--fps', type = int, default = 5)
     parser.add_argument('--ratio', type = float, default = 0.05)
     parser.add_argument('--samples_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/samples/seg')
+    parser.add_argument('--result_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/result/seg')
     parser.add_argument('--window_size', type = int, default = 5)
     parser.add_argument('--mode', type = int, default = 1)
     parser.add_argument('--max_worker', type = int, default = 10)
@@ -194,7 +195,7 @@ if __name__ == "__main__":
     annotation_dict = {}
     
     if args.mode == 1:
-        with open(args.train_txt) as f:
+        with open('{}/{}'.format(args.result_dir, args.train_postfix)) as f:
             annotation_dict = json.loads(f.read())
         samples = gen_samples(annotation_dict, label_id_dict,
                          args.fps, args.window_size, args.feats_dir,
@@ -203,15 +204,15 @@ if __name__ == "__main__":
         random.shuffle(samples)
         val_len = int(len(samples) * args.ratio)
         train_len = len(samples) - val_len
-        with open(args.samples_dir + '/train', 'w') as scene_train_fs:
+        with open(args.samples_dir + '/{}'.format(args.train_postfix), 'w') as scene_train_fs:
             write_samples(samples[:train_len], scene_train_fs)
-        with open(args.samples_dir + '/val', 'w') as scene_val_fs:
+        with open(args.samples_dir + '/val_{}'.format(args.train_postfix), 'w') as scene_val_fs:
             write_samples(samples[train_len:], scene_val_fs)
     elif args.mode == 2:
         samples = gen_samples({}, label_id_dict, 
                          args.fps, args.window_size, args.feats_dir,
                          args.test_postfix,
                          args.extract_youtube8m, args.extract_stft)
-        with open(args.samples_dir + '/test', 'w') as scene_test_fs:
+        with open(args.samples_dir + '/{}'.format(args.test_postfix), 'w') as scene_test_fs:
             write_samples(samples, scene_test_fs)
 
