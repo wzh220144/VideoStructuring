@@ -17,7 +17,7 @@ import tqdm
 import os.path as osp
 
 #################Inference Utils#################
-tokokenizer = tokenization.FullTokenizer(vocab_file='pretrained/bert/chinese_L-12_H-768_A-12/vocab.txt')
+tokokenizer = tokenization.FullTokenizer(vocab_file='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/bert/chinese_L-12_H-768_A-12/vocab.txt')
 class TaggingModel():
     def __init__(self, args):
         tag_id_file = args.tag_id_file
@@ -188,10 +188,10 @@ def run(test_file, args, model):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_pb', default='checkpoints/ds/export/step_10000_0.6879',type=str)
-    parser.add_argument('--tag_id_file', default='../dataset/label_id.txt')
-    parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/structuring/test5k_split_video')
-    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/structuring/test5k_split_video_feats')
+    parser.add_argument('--model_pb', default='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/checkpoints/structuring_train5k/export/step_1000_0.3844',type=str)
+    parser.add_argument('--tag_id_file', default='/home/tione/notebook/dataset/label_id.txt')
+    parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/structuring/split/test_5k_A')
+    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/structuring/split_feats/test_5k_A')
     parser.add_argument('--postfix', default='.mp4', type=str, help='test file type')
     parser.add_argument('--extract_text', type=bool, default=True)
     parser.add_argument('--extract_video', type=bool, default=True)
@@ -199,8 +199,8 @@ if __name__ == '__main__':
     parser.add_argument('--extract_img', type=bool, default=True)
     parser.add_argument('--top_k', type=int, default=20)
     parser.add_argument('--output', default="results/result_for_vis.txt", type=str) #用于可视化文件
-    parser.add_argument('--output_base', default="results", type=str) #用于可视化文件
-    parser.add_argument('--output_json', default="results/outjson.txt", type=str) #用于模型精度评估
+    parser.add_argument('--output_base', default="/home/tione/notebook/dataset/results/tag", type=str) #用于可视化文件
+    parser.add_argument('--output_json', default="/home/tione/notebook/dataset/results/tag/outjson.txt", type=str) #用于模型精度评估
     parser.add_argument('--max_worker', type=int, default=20)
     parser.add_argument('--save_feat', type=bool, default=True)
     parser.add_argument('--use_gpu', type=int, default=1)
@@ -225,6 +225,7 @@ if __name__ == '__main__':
     os.makedirs(audio_npy_folder, exist_ok=True)
     os.makedirs(text_txt_folder, exist_ok=True)
     os.makedirs(image_jpg_folder, exist_ok=True)
+    os.makedirs(args.output_base, exist_ok=True)
 
     ps = []
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:

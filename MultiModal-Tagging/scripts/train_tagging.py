@@ -138,5 +138,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--config',default='configs/config.example.yaml',type=str)
+    parser.add_argument('--use_gpu',default=1,type=int)
     args = parser.parse_args()
+    if args.use_gpu == 1:
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     train_main(args.config, TaggingTrainer)

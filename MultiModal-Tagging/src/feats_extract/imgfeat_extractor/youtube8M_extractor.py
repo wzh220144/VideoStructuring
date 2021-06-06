@@ -63,7 +63,7 @@ class YouTube8MFeatureExtractor(object):
     # Create MODEL_DIR if not created.
     self._model_dir = model_dir
     assert os.path.exists(model_dir)
-    self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     if use_batch:
       inception_proto_file = os.path.join(self._model_dir, 'classify_image_graph_def_batch.pb')
     else:

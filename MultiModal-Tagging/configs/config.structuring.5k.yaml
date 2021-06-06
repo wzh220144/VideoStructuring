@@ -8,7 +8,7 @@ ModelConfig:
   modal_drop_rate: 0.3
   with_video_head: True #视频特征
   with_audio_head: True #音频特征
-  with_text_head: True  #文本特征
+  with_text_head: False  #文本特征
   with_image_head: True #图片特征
 
   #视频特征(16384)
@@ -88,13 +88,13 @@ OptimizerConfig:
   export_model_steps: 1000
   learning_rate_decay: 0.5
   start_new_model: True # 如果为True，重新训练； 如果False，则resume
-  num_gpu: 1
-  log_device_placement: False
+  num_gpu: 2
+  log_device_placement: True
   gpu_allow_growth: True
   pretrained_model:
-    text_pretrained_model: 'pretrained/bert/chinese_L-12_H-768_A-12/bert_model.ckpt'
-    image_pretrained_model: 'pretrained/resnet_v2_50/resnet_v2_50.ckpt'
-  train_dir: 'checkpoints/structuring_train5k' #训练模型保存目录,按需修改
+    text_pretrained_model: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/bert/chinese_L-12_H-768_A-12/bert_model.ckpt'
+    image_pretrained_model: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/resnet_v2_50/resnet_v2_50.ckpt'
+  train_dir: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/checkpoints/structuring_train5k' #训练模型保存目录,按需修改
 
 #############################################################
 #    3. DataSet Config
@@ -104,19 +104,19 @@ DatasetConfig:
   shuffle: True
   train_data_source_list:
     train1:
-      file: '../dataset/structuring/GroundTruth/datafile/train.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/train.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
     train2:
-      file: '../dataset/structuring/GroundTruth/datafile/train.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/train.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
 
 
   valid_data_source_list:
     val1:
-      file: '../dataset/structuring/GroundTruth/datafile/val.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/val.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
 
-  preprocess_root: 'src/dataloader/preprocess/'
+  preprocess_root: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/src/dataloader/preprocess/'
   preprocess_config:
     feature:
       - name: 'video,video_frames_num,idx'
@@ -148,7 +148,7 @@ DatasetConfig:
         dtype: 'int64'
         class: 'text_preprocess.Preprocess'
         extra_args:
-          vocab: 'pretrained/bert/chinese_L-12_H-768_A-12/vocab.txt'
+          vocab: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/bert/chinese_L-12_H-768_A-12/vocab.txt'
           max_len: 128
     label: 
       - name: 'tagging'
@@ -156,4 +156,4 @@ DatasetConfig:
         shape: [[82]]    # class nums
         class: 'label_preprocess.Preprocess_label_sparse_to_dense'
         extra_args: 
-          index_dict: '../dataset/label_id.txt'
+          index_dict: '/home/tione/notebook/dataset/label_id.txt'

@@ -40,7 +40,9 @@ class Trainer(object):
         self.is_master = (task.type == "master" and task.index == 0)
         self.config = tf.ConfigProto( allow_soft_placement=True,
                                       log_device_placement=self.optimizer_config.log_device_placement)
-        self.config.gpu_options.allow_growth = self.optimizer_config.gpu_allow_growth
+        #self.config.gpu_options.allow_growth = self.optimizer_config.gpu_allow_growth
+        self.config.gpu_options.allow_growth = True
+        self.config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
         #根据配置文件选择哪些数据模态构建模型(支持四种模态输入)
         self.modal_name_list = []
@@ -72,18 +74,17 @@ class Trainer(object):
         self.global_step = tf.Variable(0, trainable=False, name="global_step")
 
         #GPU/CPU设置
-        gpus = [x.name for x in device_lib.list_local_devices() if x.device_type == 'GPU'][:self.optimizer_config.num_gpu]
+        gpus = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
+        gpu_devices = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
+        cpu_devices = [x.name for x in device_lib.list_local_devices() if 'CPU' in x.device_type]
         num_gpus = len(gpus)
         if num_gpus > 0:
             logging.info("Using the following GPUs to train: " + str(gpus))
             num_towers = num_gpus
-            device_string = '/gpu:%d'
         else:
             logging.info("No GPUs found. Training on CPU.")
             num_towers = 1
-            device_string = '/cpu:%d'
         num_towers = num_towers
-        device_string = device_string
 
         #优化器构建
         learning_rate_dict = self.optimizer_config.learning_rate_dict
@@ -117,32 +118,36 @@ class Trainer(object):
             tower_predictions_dict[task_name] = []
 
         for i in range(num_towers):
-            with tf.device(device_string % i):
+            if len(gpu_devices) > 0:
+                device = gpu_devices[i]
+            else:
+                device = cpu_devices[i]
+            with tf.device(device):
                 with (tf.variable_scope(("tower"), reuse=True if i > 0 else None)):
-                    with (slim.arg_scope([slim.model_variable, slim.variable], device="/cpu:0" if num_gpus != 1 else "/gpu:0")):
+                    with (slim.arg_scope([slim.model_variable, slim.variable], device=cpu_devices[0])):
                         result_dict = self.model(tower_inputs[i],train_batch_size = self.reader.batch_size//num_towers, is_training=True)
-
+    
                         #遍历所有分类任务输出
                         for task_name in self.reader.label_num_dict:
                             if task_name in tower_predictions_dict: 
                                 tower_predictions_dict[task_name].append(result_dict[task_name+'_output_fusion']["predictions"])
                             else: 
                                 tower_predictions_dict[task_name] = [result_dict[task_name+'_output_fusion']["predictions"]]
-
+    
                         #遍历所有分类任务损失函数
                         loss_fn_dict={}
                         for task_name, task_loss_type in self.optimizer_config.loss_type_dict.items():
                           loss_fn = loss_lib.get_instance(task_loss_type, paramters_dict={}) #TODO(jefxiong, 支持损失函数的额外参数输入)
                           loss_fn_dict[task_name] = loss_fn
                         loss_dict = self.model.build_loss(tower_inputs[i], result_dict, loss_fn_dict)
-
+    
                         #聚合不同GPU上的loss
                         for key,loss in loss_dict.items():
                           if key in tower_losses_dict: 
                               tower_losses_dict[key].append(loss)
                           else: 
                               tower_losses_dict[key] = [loss]
-
+    
                         #BN 相关
                         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
                         if update_ops:

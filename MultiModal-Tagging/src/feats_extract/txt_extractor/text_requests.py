@@ -17,13 +17,8 @@ class VideoOCR():
     def __init__(self, use_gpu):
         self.reader = easyocr.Reader(['ch_sim','en'], gpu = use_gpu)
     """视频OCR"""
-    def request(self, rgb_list):
-        res = set([])
-        for rgb in rgb_list:
-            t = self.reader.readtext(rgb, detail=0)
-            for x in t:
-                res.add(x)
-        return res
+    def request(self, rgb):    #最多取三帧结果
+        return list(self.reader.readtext(rgb, detail=0))
     
 class ImageOCR():
     def __init__(self, use_gpu):
