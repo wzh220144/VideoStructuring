@@ -41,8 +41,12 @@ class TaggingModel():
 
         batch_size = args.video_feats_extractor_batch_size
         imgfeat_extractor = args.imgfeat_extractor
-        self.feat_extractor = MultiModalFeatureExtract(batch_size=batch_size, imgfeat_extractor = imgfeat_extractor, 
-                             extract_video = args.extract_video, extract_audio = args.extract_audio, extract_text = args.extract_text, extract_img = args.extract_img)
+        self.feat_extractor = MultiModalFeatureExtract(batch_size=batch_size,
+                             extract_video = args.extract_video, 
+                             extract_audio = args.extract_audio, 
+                             extract_ocr = args.extract_ocr,
+                             extract_asr = args.extract_asr,
+                             extract_img = args.extract_img)
 
     def image_preprocess(self, image, rescale=224):
         #resize to 224 and normlize to 0-1, then perform f(x)= 2*(x-0.5)
@@ -63,6 +67,7 @@ class TaggingModel():
 
     def preprocess(self, feat_dict, max_frame_num=300):
         ret_dict = {}
+        #print('preprocess: {}'.format(feat_dict))
         for feat_type in feat_dict:
             if feat_type=='video':
                 if len(feat_dict['video']) == 0:
@@ -83,25 +88,39 @@ class TaggingModel():
             elif feat_type == 'image':
                 feats = self.image_preprocess(feat_dict['image'])
             else:
-                raise
+                continue
             ret_dict[feat_type] = feats
         return ret_dict
 
 
     def inference(self, test_file, args):
-        prefix = test_file.split("/")[-1].split(".m")[0]
-        frame_npy_path = args.feat_dir + '/video_npy/' + prefix + '.npy'
-        audio_npy_path = args.feat_dir + '/audio_npy/' + prefix + '.npy'
-        txt_file_path = args.feat_dir + '/text_txt/' + prefix + '.txt'
-        image_jpg_path = args.feat_dir + '/image_jpg/' + prefix + '.jpg'
+        vid = test_file.split("/")[-1].split(".m")[0]
+        video_npy_folder = args.feat_dir + '/video_npy'
+        img_jpg_folder = args.feat_dir + '/image_jpg'
+        audio_npy_folder = args.feat_dir + '/audio_npy'
+        text_txt_folder = args.feat_dir + '/text_txt'
+        ocr_txt_folder = args.feat_dir + '/ocr_txt'
+        asr_txt_folder = args.feat_dir + '/asr_txt'
+        image_jpg_folder = args.feat_dir + '/image_jpg'
+
+        video_npy_path = os.path.join(video_npy_folder, vid+'.npy')
+        audio_npy_path = os.path.join(audio_npy_folder, vid+'.npy')
+        image_jpg_path = os.path.join(image_jpg_folder, vid+'.jpg')
+        text_txt_path = os.path.join(text_txt_folder, vid+'.txt')
+        asr_txt_path = os.path.join(asr_txt_folder, vid+'.txt')
+        ocr_txt_path = os.path.join(ocr_txt_folder, vid+'.txt')
+
         with self.sess.as_default() as sess:
             start_time = time.time()
-            feat_dict = self.feat_extractor.extract_feat(test_file,
-                    frame_npy_path=frame_npy_path,
-                    audio_npy_path=audio_npy_path,
-                    txt_file_path=txt_file_path,
-                    image_jpg_path=image_jpg_path,
-                    save=args.save_feat)
+            feat_dict = self.feat_extractor.extract_feat(
+                    test_file,
+                    video_npy_path,
+                    text_txt_path,
+                    audio_npy_path,
+                    image_jpg_path,
+                    ocr_txt_path,
+                    asr_txt_path,
+                    True)
             end_time = time.time()
             print("feature extract cost time: {} sec".format(end_time - start_time))
 
@@ -138,7 +157,7 @@ class TaggingModel():
 def run(test_file, args, model):
     key = test_file.split('/')[-1].split('.m')[0]
     p = osp.join(args.output_base, key)
-    video_id, segment_id, start_time, end_time, _ = test_file.split("/")[-1].split(".m")[0].split("#")
+    video_id, start_time, end_time, fps = test_file.split("/")[-1].split(".m")[0].split("#")
     if osp.exists(p):
         labels = []
         scores = []
@@ -181,56 +200,65 @@ def run(test_file, args, model):
         cur_output = {}
     '''
 
-    video_id, segment_id, start_time, end_time, _ = test_file.split("/")[-1].split(".m")[0].split("#")
+    video_id, start_time, end_time, _ = test_file.split("/")[-1].split(".m")[0].split("#")
 
     return (video_id, cur_output)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_pb', default='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/checkpoints/structuring_train5k/export/step_1000_0.3844',type=str)
+    parser.add_argument('--model_pb', default='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/checkpoints/structuring_train5k/export/step_8000_1.1595',type=str)
     parser.add_argument('--tag_id_file', default='/home/tione/notebook/dataset/label_id.txt')
-    parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/structuring/split/test_5k_A')
-    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/structuring/split_feats/test_5k_A')
+    parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/split/test_5k_A')
     parser.add_argument('--postfix', default='.mp4', type=str, help='test file type')
-    parser.add_argument('--extract_text', type=bool, default=True)
-    parser.add_argument('--extract_video', type=bool, default=True)
-    parser.add_argument('--extract_audio', type=bool, default=True)
-    parser.add_argument('--extract_img', type=bool, default=True)
     parser.add_argument('--top_k', type=int, default=20)
     parser.add_argument('--output', default="results/result_for_vis.txt", type=str) #用于可视化文件
-    parser.add_argument('--output_base', default="/home/tione/notebook/dataset/results/tag", type=str) #用于可视化文件
-    parser.add_argument('--output_json', default="/home/tione/notebook/dataset/results/tag/outjson.txt", type=str) #用于模型精度评估
+    parser.add_argument('--output_base', default="/home/tione/notebook/dataset/result/tag", type=str) #用于可视化文件
+    parser.add_argument('--output_json', default="/home/tione/notebook/dataset/result/tag/outjson.txt", type=str) #用于模型精度评估
     parser.add_argument('--max_worker', type=int, default=20)
     parser.add_argument('--save_feat', type=bool, default=True)
     parser.add_argument('--use_gpu', type=int, default=1)
     parser.add_argument('--imgfeat_extractor', type=str, default='Youtube8M')
     parser.add_argument('--video_feats_extractor_batch_size', type=int, default=8)
+    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/split_feats/test_5k_A')
+    parser.add_argument('--extract_video', type=bool, default=True)
+    parser.add_argument('--extract_img', type=bool, default=True)
+    parser.add_argument('--extract_audio', type=bool, default=True)
+    parser.add_argument('--extract_asr', type=bool, default=True)
+    parser.add_argument('--extract_ocr', type=bool, default=True)
+
     args = parser.parse_args()
     if args.use_gpu == 1:
-        os.environ["CUDA_VISIBLE_DEVICES"]='0,1'
+        os.environ["CUDA_VISIBLE_DEVICES"]='0'
     
     model = TaggingModel(args)
     test_files = glob.glob(args.test_dir+'/*'+args.postfix)
     test_files.sort()    
     output_result = {}
-
-    #如果选择特征保存,相关路径需先创建
-    frame_npy_folder = args.feat_dir + '/video_npy'
+    
+    video_npy_folder = args.feat_dir + '/video_npy'
+    img_jpg_folder = args.feat_dir + '/image_jpg'
     audio_npy_folder = args.feat_dir + '/audio_npy'
     text_txt_folder = args.feat_dir + '/text_txt'
+    ocr_txt_folder = args.feat_dir + '/ocr_txt'
+    asr_txt_folder = args.feat_dir + '/asr_txt'
     image_jpg_folder = args.feat_dir + '/image_jpg'
     os.makedirs(args.feat_dir, exist_ok=True)
-    os.makedirs(frame_npy_folder, exist_ok=True)
+    os.makedirs(video_npy_folder, exist_ok=True)
+    os.makedirs(image_jpg_folder, exist_ok=True)
     os.makedirs(audio_npy_folder, exist_ok=True)
     os.makedirs(text_txt_folder, exist_ok=True)
+    os.makedirs(ocr_txt_folder, exist_ok=True)
+    os.makedirs(asr_txt_folder, exist_ok=True)
     os.makedirs(image_jpg_folder, exist_ok=True)
     os.makedirs(args.output_base, exist_ok=True)
+
 
     ps = []
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
         for test_file in test_files:
             ps.append(executor.submit(run, test_file, args, model))
+            #run(test_file, args, model)
         cnt = 0
         for p in ps:
             cnt += 1

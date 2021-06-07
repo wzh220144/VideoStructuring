@@ -83,7 +83,7 @@ def save(res, path):
                 obj[video_id]['annotations'].append({'segment': [s, e], 'labels': []})
                 s = e
             pre_video_id = video_id
-        if pre_video_id != '':
+        if pre_video_id != '' and s != e:
             obj[pre_video_id]['annotations'].append({'segment': [s, e], 'labels': []})
         json.dump(obj, fs)
 

@@ -108,7 +108,7 @@ class MultiModalFeatureExtract(object):
             start_time = time.time()
             feat_dict['video'] = []
             if video_npy_path is not None and os.path.exists(video_npy_path):
-                feat_dict['video'] = np.load('video_npy_path')
+                feat_dict['video'] = np.load(video_npy_path)
             else:
                 cap = cv2.VideoCapture(video_file)
                 for r_index, r_frame, r_time, count in self.gen_img_batch(cap, frames, self.batch_size, 'extract video feat {}'.format(video_file)):
@@ -223,11 +223,15 @@ class MultiModalFeatureExtract(object):
         feat_dict = self.extract_video_feat(feat_dict, video_file, frames, video_npy_path, save)
         feat_dict = self.extract_img_feat(feat_dict, video_file, sorted(list(frames))[len(frames) // 2], img_jpg_path, save)
         feat_dict = self.extract_audio_feat(feat_dict, audio_file, audio_npy_path, save)
-        feat_dict = self.extract_ocr_feat(feat_dict, video_file, frames, ocr_file_path, save)
-        feat_dict = self.extract_asr_feat(feat_dict, audio_file, asr_file_path, save)
-        feat_dict['text'] = {'video_ocr': '|'.join(feat_dict['ocr']), 'video_asr': feat_dict['asr']}
-        with open(text_txt_path, 'w') as f:
-            f.write(json.dumps(feat_dict['text'], ensure_ascii=False))
+        if os.path.exists(text_txt_path):
+            with open(text_txt_path, 'r') as f:
+                feat_dict['text'] = f.readline().strip('\n')
+        else:
+            feat_dict = self.extract_ocr_feat(feat_dict, video_file, frames, ocr_file_path, save)
+            feat_dict = self.extract_asr_feat(feat_dict, audio_file, asr_file_path, save)
+            feat_dict['text'] = json.dumps({'video_ocr': '|'.join(feat_dict['ocr']), 'video_asr': feat_dict['asr']}, ensure_ascii=False)
+            with open(text_txt_path, 'w') as f:
+                f.write(feat_dict['text'])
         return feat_dict
 
     def gen_img_list(self, cap, frames):
