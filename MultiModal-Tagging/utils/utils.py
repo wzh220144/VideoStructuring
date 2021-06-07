@@ -34,7 +34,7 @@ def get_frames_same_ts_interval(ts, interval, max_frame):
     frame_count = len(ts)
     while cur_frame < frame_count:
         t = ts[cur_frame]
-        if index * interval <= cur_frame:
+        if index * interval <= t:
             frames.add(cur_frame)
             index += 1
         cur_frame += 1

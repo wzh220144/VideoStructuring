@@ -13,6 +13,8 @@ import os.path as osp
 
 from src.feats_extract.multimodal_feature_extract import MultiModalFeatureExtract
 
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--files_dir', default='/home/tione/notebook/dataset/split/test_5k_A', type=str)
@@ -57,7 +59,7 @@ if __name__ == '__main__':
         return
       try:
           print(file_path)
-          gen.extract_feat(file_path, video_npy_path, audio_npy_path, text_txt_path, img_jpg_path, ocr_file_path, asr_file_path, True)
+          gen.extract_feat(file_path, video_npy_path, text_txt_path, audio_npy_path, image_jpg_path, ocr_txt_path, asr_txt_path, True)
       except Exception as e:
           print(file_path, traceback.format_exc())
             
@@ -67,7 +69,7 @@ if __name__ == '__main__':
     print('start extract feats')
     ps = []
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
-        for file_path in tqdm.tqdm(file_paths, total=len(file_paths)):
+        for file_path in file_paths:
             vid = os.path.basename(file_path).split('.m')[0]
             video_npy_path = os.path.join(video_npy_folder, vid+'.npy')
             audio_npy_path = os.path.join(audio_npy_folder, vid+'.npy')
@@ -76,5 +78,6 @@ if __name__ == '__main__':
             asr_txt_path = os.path.join(asr_txt_folder, vid+'.txt')
             ocr_txt_path = os.path.join(ocr_txt_folder, vid+'.txt')
             ps.append(executor.submit(process_file, file_path, video_npy_path, audio_npy_path, text_txt_path, image_jpg_path, asr_txt_path, ocr_txt_path))
-        for p in ps:
+            #process_file(file_path, video_npy_path, audio_npy_path, text_txt_path, image_jpg_path, asr_txt_path, ocr_txt_path)
+        for p in tqdm.tqdm(ps, total=len(ps)):
             p.result()
