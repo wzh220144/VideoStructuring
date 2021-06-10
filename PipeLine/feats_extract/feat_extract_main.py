@@ -12,11 +12,11 @@ import time
 import tensorflow as tf
 import random
 
+
 def process_file(gen, file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir):
     if not os.path.exists(file_path):
         return
     try:
-        print(file_path)
         gen.extract_feat(file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir, True)
     except Exception as e:
         print(file_path, traceback.format_exc())
@@ -24,11 +24,11 @@ def process_file(gen, file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vg
 if __name__ == '__main__':
     start_time = time.time()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--files_dir', default='/home/tione/notebook/dataset/structuring/videos/train_5k_A', type=str)
+    parser.add_argument('--files_dir', default='/home/tione/notebook/dataset/videos/train_5k_A', type=str)
     parser.add_argument('--postfix', default='mp4', type=str)
     parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/structuring/feats/train_5k_A')
-    parser.add_argument('--split_dir', default='/home/tione/notebook/dataset/structuring/split/train_5k_A')
+    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/feats/train_5k_A')
+    parser.add_argument('--split_dir', default='/home/tione/notebook/dataset/split/train_5k_A')
     parser.add_argument('--extract_youtube8m', type=bool, default=True)
     parser.add_argument('--extract_resnet50', type=bool, default=False)
     parser.add_argument('--extract_vggish', type=bool, default=False)
@@ -38,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_worker', type=int, default=30)
     parser.add_argument('--fps', type=int, default=5)
     parser.add_argument('--use_gpu', type=bool, default=True)
+    parser.add_argument('--device', type=str, default='1')
     args = parser.parse_args()
 
     youtube8m_folder = args.feat_dir + '/youtube8m'
@@ -56,7 +57,8 @@ if __name__ == '__main__':
     os.makedirs(asr_folder, exist_ok=True)
 
     gens = []
-    for device in ['0', '1']:
+    os.environ["CUDA_VISIBLE_DEVICES"]=args.device
+    for device in ['0']:
         with tf.device('/gpu:{}'.format(device)):
             gens.append(MultiModalFeatureExtract(batch_size=args.batch_size,
                                                  extract_youtube8m=args.extract_youtube8m,
@@ -81,7 +83,7 @@ if __name__ == '__main__':
             stft_dir = os.path.join(stft_folder, vid)
             ocr_dir = os.path.join(ocr_folder, vid)
             asr_dir = os.path.join(asr_folder, vid)
-            t = random.randint(0, 1)
+            t = random.randint(0, 0)
             ps.append(executor.submit(process_file, gens[t], file_path, args.split_dir, args.fps,
                                       youtube8m_dir, resnet50_dir,
                                       vggish_dir, stft_dir,

@@ -35,11 +35,13 @@ def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extrac
             if extract_youtube8m:
                 youtube8m_feat_path = os.path.join(youtube8m_feats_dir, '{}#{}.npy'.format(video_id, cur_frame))
                 if not os.path.exists(youtube8m_feat_path):
+                    print('{} do not exist.'.format(youtube8m_feat_path))
                     flag = False
                 youtube8m_feat_path = '#{}.npy'.format(cur_frame)
             if extract_stft:
-                stft_feat_path = os.path.join(stft_feats_dir, '{}{}#{}#{}.npy'.format(video_id, video_id, cur_frame, cur_frame + fps))
+                stft_feat_path = os.path.join(stft_feats_dir, '{}#{}#{}.npy'.format(video_id, cur_frame, cur_frame + fps))
                 if not os.path.exists(stft_feat_path):
+                    print('{} do not exist.'.format(stft_feat_path))
                     flag = False
                 stft_feat_path = '#{}#{}.npy'.format(cur_frame, cur_frame + fps)
             if not flag:
@@ -111,10 +113,10 @@ def gen_labels(info, label_id_dict, video_annotation):
                 info['label'][i] = 0    #最后一个场景没有切分点
     return info, flag
 
-def do_gen_samples(info, window_size):
+def do_gen_samples(args, info, window_size):
     l = len(info['index'])
     res = []
-    for cur in range(1, l - 1): #第一个frame及最后一个frame不能作为准确sample
+    for cur in range(0, l): #第一个frame及最后一个frame不能作为准确sample
         sample = {}
         b1 = list(range(max(0, cur - window_size), cur))
         b2 = list(range(cur, min(cur + window_size, l)))
@@ -132,7 +134,7 @@ def do_gen_samples(info, window_size):
         res.append(sample)
     return res
 
-def _gen_samples(video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict):
+def _gen_samples(args, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict):
     info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
     #print(info)
     video_name = video_file.split('/')[-1]
@@ -143,9 +145,9 @@ def _gen_samples(video_file, fps, window_size, label_id_dict, youtube8m_feats_di
     #print(info)
     if not flag:
         return []
-    return do_gen_samples(info, window_size)
+    return do_gen_samples(args, info, window_size)
 
-def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, postfix, extract_youtube8m, extract_stft):
+def gen_samples(args, annotation_dict, label_id_dict, fps, window_size, feats_dir, postfix, extract_youtube8m, extract_stft):
     youtube8m_feats_dir = os.path.join(feats_dir, postfix, 'youtube8m')
     stft_feats_dir = os.path.join(feats_dir, postfix, 'stft')
     video_files = glob.glob(os.path.join(args.video_dir, postfix, '*.mp4'))
@@ -153,7 +155,7 @@ def gen_samples(annotation_dict, label_id_dict, fps, window_size, feats_dir, pos
     res = []
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
         for video_file in tqdm.tqdm(video_files, total = len(video_files), desc = 'send task to pool'):
-            ps.append(executor.submit(_gen_samples, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
+            ps.append(executor.submit(_gen_samples, args, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
         for p in tqdm.tqdm(ps, total = len(ps), desc = 'gen samples'):
             res.extend(p.result())
     return res
@@ -182,7 +184,7 @@ if __name__ == "__main__":
     parser.add_argument('--extract_youtube8m', type = bool, default = True)
     parser.add_argument('--extract_stft', type = bool, default = True)
     parser.add_argument('--fps', type = int, default = 5)
-    parser.add_argument('--ratio', type = float, default = 0.05)
+    parser.add_argument('--ratio', type = float, default = 0.04)
     parser.add_argument('--samples_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/samples/seg')
     parser.add_argument('--result_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/result/seg')
     parser.add_argument('--window_size', type = int, default = 5)
@@ -197,19 +199,36 @@ if __name__ == "__main__":
     if args.mode == 1:
         with open('{}/{}'.format(args.result_dir, args.train_postfix)) as f:
             annotation_dict = json.loads(f.read())
-        samples = gen_samples(annotation_dict, label_id_dict,
+        samples = gen_samples(args, annotation_dict, label_id_dict,
                          args.fps, args.window_size, args.feats_dir,
                          args.train_postfix,
                          args.extract_youtube8m, args.extract_stft)
-        random.shuffle(samples)
-        val_len = int(len(samples) * args.ratio)
-        train_len = len(samples) - val_len
+        
+        ids = set([])
+        for sample in samples:
+            ids.add(sample['id'])
+        ids = list(ids)
+        random.shuffle(ids)
+        print('video num: {}'.format(len(ids)))
+        val_len = int(len(ids) * args.ratio)
+        train_len = len(ids) - val_len
+        val_ids = set(ids[:val_len])
+        train_ids = set(ids[val_len:])
+        print('train video num: {}, val video num: {}'.format(train_len, val_len))
+        train_samples = []
+        val_samples = []
+        for sample in samples:
+            if sample['id'] in train_ids:
+                train_samples.append(sample)
+            else:
+                val_samples.append(sample)
+        random.shuffle(train_samples)
         with open(args.samples_dir + '/{}'.format(args.train_postfix), 'w') as scene_train_fs:
-            write_samples(samples[:train_len], scene_train_fs)
+            write_samples(train_samples, scene_train_fs)
         with open(args.samples_dir + '/val_{}'.format(args.train_postfix), 'w') as scene_val_fs:
-            write_samples(samples[train_len:], scene_val_fs)
+            write_samples(val_samples, scene_val_fs)
     elif args.mode == 2:
-        samples = gen_samples({}, label_id_dict, 
+        samples = gen_samples(args, {}, label_id_dict, 
                          args.fps, args.window_size, args.feats_dir,
                          args.test_postfix,
                          args.extract_youtube8m, args.extract_stft)

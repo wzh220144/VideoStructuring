@@ -32,8 +32,8 @@ class SegDataset(Dataset):
         '''
         self.use_cache = use_cache
 
+
     def pre(self):
-        print('pre start')
         with ThreadPoolExecutor(max_workers=50) as executor:
             ps = []
             for feat_path in os.listdir(self.youtube8m_feats_dir)[:youtube8m_cache_size]:
@@ -43,7 +43,7 @@ class SegDataset(Dataset):
                 ps.append(executor.submit(self.get_youtube8m_feat, video_id, index))
             for feat_path in os.listdir(self.stft_feats_dir)[:stft_cache_size]:
                 t = feat_path.split('.npy')[0].split('#')
-                video_id = t[0][:len(t[0]) // 2]
+                video_id = t[0]
                 index = '#' + t[1] + '#' + t[2] + '.npy'
                 ps.append(executor.submit(self.get_stft_feat, video_id, index))
             for p in tqdm.tqdm(ps, total=len(ps)):
@@ -82,13 +82,17 @@ class SegDataset(Dataset):
     def get_youtube8m_feat_without_cache(self, video_id, index):
         feat_path = os.path.join(self.youtube8m_feats_dir, '{}{}'.format(video_id, index))
         if os.path.exists(feat_path):
-            return np.load(feat_path)
+            try:
+                return np.load(feat_path)
+            except:
+                print('load {} failed.'.format(feat_path))
+                return np.zeros(1024)
         else:
             print('{} not exist.'.format(feat_path))
             return np.zeros(1024)
 
     def get_stft_feat_without_cache(self, video_id, index):
-        feat_path = os.path.join(self.stft_feats_dir, '{}{}{}'.format(video_id, video_id, index))
+        feat_path = os.path.join(self.stft_feats_dir, '{}{}'.format(video_id, index))
         if os.path.exists(feat_path):
             try:
                 return np.load(feat_path)

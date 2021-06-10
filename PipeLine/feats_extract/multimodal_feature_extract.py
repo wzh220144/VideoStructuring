@@ -150,10 +150,11 @@ class MultiModalFeatureExtract(object):
     def extract_stft_feat(self, video_file, split_audio_files, stft_dir, save):
         if self.extract_stft:
             start_time = time.time()
-            progress_bar = tqdm(total=len(split_audio_files), miniters=1, desc='extract stft feat {}'.format(video_file))
+            #progress_bar = tqdm(total=len(split_audio_files), miniters=1, desc='extract stft feat {}'.format(video_file))
             for audio_file in split_audio_files:
-                progress_bar.update(1)
-                feat_path = stft_dir + '.npy'
+                #progress_bar.update(1)
+                vid = '#'.join(audio_file.split('.')[0].split('#')[1:])
+                feat_path = stft_dir + '#' + vid + '.npy'
                 if os.path.exists(feat_path):
                     self.error_log.write('{} exist.\n'.format(feat_path))
                     continue
@@ -162,10 +163,10 @@ class MultiModalFeatureExtract(object):
                     if save:
                         np.save(feat_path, t)
                 except Exception as e:
-                    self.error_log.write("extract vggish from {} failed: {}\n".format(audio_file, e))
+                    self.error_log.write("extract stft from {} failed: {}\n".format(audio_file, e))
             end_time = time.time()
             self.error_log.write("{}: stft extract cost {} sec.\n".format(video_file, end_time - start_time))
-            progress_bar.close()
+            #progress_bar.close()
 
     def extrat_resnet50_feat(self, video_file, frames, resnet50_dir, save):
         if self.extract_resnet50:
@@ -227,20 +228,22 @@ class MultiModalFeatureExtract(object):
         r_time = []
         count = 0
         index = 0
-        progress_bar = tqdm(total=len(frames), miniters=1, desc=desc)
+        #progress_bar = tqdm(total=len(frames), miniters=1, desc=desc)
         while True:
             has_frame, frame = cap.read()
             if not has_frame:
                 break
             ts = cap.get(cv2.CAP_PROP_POS_MSEC)
             if index in frames:
-                t = feat_dir + str(index) + '.npy'
+                t = feat_dir + '#' + str(index) + '.npy'
                 if not os.path.exists(t):
                     r_index.append(index)
                     r_frame.append(frame)
                     r_time.append(ts)
-                    progress_bar.update(1)
+                    #progress_bar.update(1)
                     count += 1
+                else:
+                    self.error_log.write('{} exist.\n'.format(t))
             if count == batch_size:
                 yield r_index, r_frame, r_time, count
                 count = 0
@@ -250,7 +253,7 @@ class MultiModalFeatureExtract(object):
             index += 1
         if count > 0:
             yield r_index, r_frame, r_time, count
-        progress_bar.close()
+        #progress_bar.close()
 
     def gen_ts_interval(self, cap, frames, desc):
         count = 0

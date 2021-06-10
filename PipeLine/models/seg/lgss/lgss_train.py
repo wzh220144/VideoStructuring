@@ -12,6 +12,8 @@ import torch.nn.functional as functional
 import numpy as np
 import tqdm
 import sklearn
+import sklearn.metrics
+from concurrent.futures import ThreadPoolExecutor
 
 os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
 
@@ -57,7 +59,7 @@ def get_mAP_seq(loader, gts_raw, preds_raw):
         # print(mAP)
     return np.mean(mAP), np.array(mAP)
 
-def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_loader, writer, max_ap):
+def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_loader, writer, best_f1, best_threshold):
     global train_iter
     model.train()
     total_loss = 0.0
@@ -99,14 +101,14 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
         acc = sklearn.metrics.accuracy_score(_label, _pred)
         recall = sklearn.metrics.recall_score(_label, _pred, zero_division=1)
         precision = sklearn.metrics.precision_score(_label, _pred, zero_division=1)
-        ap = sklearn.metrics.average_precision_score(_label, _prob)
-        f1 = sklearn.metrics.f1_score(_label, _pred)
+        #ap = sklearn.metrics.average_precision_score(_label, _prob)
+        f1 = sklearn.metrics.f1_score(_label, _pred, zero_division=1)
 
         total_acc += acc
         total_recall += recall
         total_precision += precision
         total_auc += auc
-        total_ap += ap
+        #total_ap += ap
         total_f1 += f1
 
         writer.add_scalar('train/loss', total_loss / (batch_idx + 1), train_iter)
@@ -119,7 +121,6 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
                 'cur loss: {:.6f}, avg loss: {:.6f}, cur auc: {:.6f}, avg auc: {:.6f},' + \
                 ' cur acc: {:.6f}, avg acc: {:.6f}, cur recall: {:.6f}, avg recall: {:.6f},' + \
                 ' cur precision: {:.6f}, avg precision: {:.6f},' + \
-                ' cur ap: {:.6f}, avg ap: {:.6f},' + \
                 ' cur f1: {:.6f}, avg f1: {:.6f}'
             print(t.format(
                 epoch,
@@ -136,35 +137,16 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
                 total_recall / (batch_idx + 1),
                 precision,
                 total_precision / (batch_idx + 1),
-                ap,
-                total_ap / (batch_idx + 1),
                 f1,
                 total_f1 / (batch_idx + 1)
                 ))
-        if batch_idx % 500 == 0:
-            print('start val...')
-            ap = test(args, model, val_loader, criterion, writer, 500)
-            if ap > max_ap:
-                is_best = True
-                max_ap = ap
-            else:
-                is_best = False
-            print('epoch {}: [{}/{} ({:.0f}%)]\tcur app: {:.6f}, max_ap: {:.6f}'.format(
-                epoch,
-                int(batch_idx * len(youtube8m_data)),
-                len(data_loader.dataset),
-                100. * batch_idx / len(data_loader),
-                loss.item(),
-                ap,
-                max_ap
-                ))
-            
-            save_checkpoint({'state_dict': model.state_dict(), 'epoch': epoch + 1,}, 
-                    is_best = is_best, fpath = osp.join(args.model_dir, 'checkpoint.pth.tar'))
+        if batch_idx % 10000 == 0 and batch_idx != 0:
+            best_f1, best_threshold = test(args, model, val_loader, best_f1, best_threshold, criterion, epoch)
 
-    scheduler.step()
-    return max_ap
+        scheduler.step()
+    return best_f1, best_threshold
 
+'''
 def test(args, model, data_loader, criterion, writer, max_batch = -1):
     global val_iter
     model.eval()
@@ -175,7 +157,7 @@ def test(args, model, data_loader, criterion, writer, max_batch = -1):
     preds, gts = [], []
     batch_num = 1  # 0
     with torch.no_grad():
-        for youtube8m_data, stft_data, label in tqdm.tqdm(data_loader, total = len(data_loader)):
+        for youtube8m_data, stft_data, label, video_id, index, ts in tqdm.tqdm(data_loader, total = len(data_loader)):
             batch_num += 1
             label = label.view(-1)
             if args.use_gpu == 1:
@@ -224,6 +206,70 @@ def test(args, model, data_loader, criterion, writer, max_batch = -1):
         correct1, gt1, 100. * correct1 / (gt1 + 1e-5), correct0, gt0,
                        100. * correct0 / (gt0 + 1e-5)))
     return ap.mean()
+'''
+
+def gen_batch(data_loader, executor, args, threshold, model, criterion):
+    cnt = 0
+    ps = []
+    for data_youtube8m, data_stft, label, video_id, index, ts in tqdm.tqdm(data_loader, total = len(data_loader)):
+        cnt += 1
+        ps.append(executor.submit(_inference, args, model,
+            data_youtube8m, data_stft, threshold,
+            video_id, index.numpy().tolist(), ts.numpy().tolist(), label.numpy().tolist(), criterion, label))
+        if cnt % args.max_worker == 0:
+            yield ps
+            ps = []
+    if cnt > 0:
+        yield ps
+
+
+
+def _inference(args, model, data_youtube8m, data_stft, threshold, video_id, index, ts, label, criterion, ori_label):
+    if args.use_gpu == 1:
+        try:
+            data_youtube8m = data_youtube8m.cuda()
+            data_stft = data_stft.cuda()
+            ori_label = ori_label.cuda()
+        except Exception as e:
+            print(e)
+            return []
+    output = model(data_youtube8m, data_stft)
+    output = output.view(-1, 2)
+    loss = criterion(output, ori_label)
+    output = functional.softmax(output, dim=1)
+    probs = output[:, 1].cpu().detach().numpy()
+    predicts = np.nan_to_num(probs > threshold).tolist()
+    probs = probs.tolist()
+    res = []
+    for i in range(len(label)):
+        res.append([video_id[i], index[i], ts[i], probs[i], predicts[i], label[i]])
+    return res, loss
+
+def inference(args, model, data_loader, threshold, criterion):
+    model.eval()
+    res = []
+    total_loss = 0.0
+    with torch.no_grad():
+        with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
+            for ps in gen_batch(data_loader, executor, args, threshold, model, criterion):
+                for p in ps:
+                    t, loss = p.result()
+                    res.extend(t)
+                    total_loss += loss
+    return res, total_loss
+
+def val(res, threshold, total_loss):
+    probs = [x[3] for x in res]
+    predicts = [1 if x[3] > threshold else 0 for x in res]
+    labels = [x[5] for x in res]
+    auc = sklearn.metrics.roc_auc_score(labels, probs)
+    acc = sklearn.metrics.accuracy_score(labels, predicts)
+    recall = sklearn.metrics.recall_score(labels, predicts, zero_division=1)
+    precision = sklearn.metrics.precision_score(labels, predicts, zero_division=1)
+    ap = sklearn.metrics.average_precision_score(labels, probs)
+    f1 = sklearn.metrics.f1_score(labels, predicts, zero_division=1)
+    avg_loss = total_loss / len(res)
+    return auc, acc, recall, precision, ap, f1, avg_loss
 
 def main():
     parser = argparse.ArgumentParser()
@@ -249,26 +295,27 @@ def main():
     parser.add_argument('--stft_feat_dim', type=int, default=512)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--logs_dir', type=str, default='/home/tione/notebook/VideoStructuring/dataset/log/seg')
+    parser.add_argument('--max_worker', type=int, default=5)
 
     args = parser.parse_args()
 
     seg_dataset.youtube8m_cache_size = args.youtube8m_cache_size
     seg_dataset.stft_cache_size = args.stft_cache_size
 
-    train_samples_path = os.path.join(args.samples_dir, 'train')
-    val_samples_path = os.path.join(args.samples_dir, 'val')
+    train_samples_path = os.path.join(args.samples_dir, 'train_5k_A')
+    val_samples_path = os.path.join(args.samples_dir, 'val_train_5k_A')
 
     train_loader = DataLoader(
             SegDataset(train_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 10,
-            prefetch_factor = 100,
+            num_workers = 5,
+            prefetch_factor = 1,
             batch_size=args.batch_size, 
             shuffle=True)
     val_loader = DataLoader(
             SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 10,
-            prefetch_factor = 100,
-            batch_size=args.batch_size, shuffle=False)
+            num_workers = 5,
+            prefetch_factor = 1,
+            batch_size=20, shuffle=False)
 
     model = LGSS(args)
     if args.use_gpu == 1:
@@ -278,9 +325,9 @@ def main():
         checkpoint = load_checkpoint(args.resume)
         model.load_state_dict(checkpoint['state_dict'])
 
-    optimizer = Adam(model.parameters(), lr = 1e-3, weight_decay=5e-4)
-    scheduler = MultiStepLR(optimizer, milestones = [1000, 3000])
-    criterion = nn.CrossEntropyLoss(torch.Tensor([0.1, 1]))
+    optimizer = Adam(model.parameters(), lr = 0.005, weight_decay=0.1)
+    scheduler = MultiStepLR(optimizer, milestones = [5000, 10000, 30000])
+    criterion = nn.CrossEntropyLoss(torch.Tensor([0.05, 1]))
     if args.use_gpu == 1:
         criterion = criterion.cuda()
 
@@ -289,21 +336,36 @@ def main():
     os.makedirs(args.logs_dir, exist_ok=True)
 
     writer = SummaryWriter(logdir=args.logs_dir)
-    max_ap = -1
+    best_f1 = -1
+    best_threshold = -1
     for epoch in range(args.epochs):
-        max_ap = train(args, model, train_loader, optimizer, scheduler, epoch, criterion, val_loader, writer, max_ap)
-        print("Val Acc")
-        ap = test(args, model, val_loader, criterion, writer)
-        if ap > max_ap:
+        best_f1, best_threshold = train(args, model, train_loader, optimizer, scheduler, epoch, criterion, val_loader, writer, best_f1, best_threshold)
+        best_f1, best_threshold = test(args, model, val_loader, best_f1, best_threshold, criterion, epoch)
+
+def test(args, model, val_loader, best_f1, best_threshold, criterion, epoch):
+    print('start val...')
+    res, total_loss = inference(args, model, val_loader, 0.55, criterion)
+    cur_max_threshold = -1
+    cur_max_f1 = 0
+    is_best = False
+    for threshold in np.arange(0, 1.01, 0.01).tolist():
+        auc, acc, recall, precision, ap, f1, avg_loss = val(res, threshold, total_loss)
+        print('threshold: {}, auc: {}, acc: {}, recall: {}, precision: {}, ap: {}, f1: {}, avg_loss: {}'.format(threshold, auc, acc, recall, precision, ap, f1, avg_loss))
+        if f1 > best_f1:
             is_best = True
-            max_ap = ap
-        else:
-            is_best = False
-        save_checkpoint(
-            {
-                'state_dict': model.state_dict(),
-                'epoch': epoch + 1,
-            }, is_best = is_best, fpath = osp.join(args.model_dir, 'checkpoint.pth.tar'))
+            best_f1 = f1
+            best_threshold = threshold
+        if f1 > cur_max_f1:
+            cur_max_f1 = f1
+            cur_max_threshold = threshold
+    print('epoch {}: \tcur_max_threshold:{:.6f}, best_threshold: {:.6f}, cur_max_f1: {:.6f}, best_f1: {:.6f}'.format(
+        epoch, cur_max_threshold, best_threshold,
+        cur_max_f1, best_f1))
+    
+    save_checkpoint({'state_dict': model.state_dict(), 'epoch': epoch + 1,}, 
+            is_best = is_best, fpath = osp.join(args.model_dir, 'checkpoint.pth.tar'))
+    return best_f1, best_threshold
+
 
 if __name__ == '__main__':
     main()
