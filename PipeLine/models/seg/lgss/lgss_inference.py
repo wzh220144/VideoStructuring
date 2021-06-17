@@ -12,53 +12,9 @@ import tqdm
 import sklearn
 import sklearn.metrics
 import json
+import models.seg.lgss.lgss_util as lgss_util
 
-def _inference(args, model, data_youtube8m, data_stft, threshold, video_id, index, ts, label):
-    if args.use_gpu == 1:
-        try:
-            data_youtube8m = data_youtube8m.cuda()
-            data_stft = data_stft.cuda()
-        except Exception as e:
-            print(e)
-            return []
-    output = model(data_youtube8m, data_stft)
-    output = output.view(-1, 2)
-    output = functional.softmax(output, dim=1)
-    probs = output[:, 1].cpu().detach().numpy()
-    predicts = np.nan_to_num(probs > threshold).tolist()
-    probs = probs.tolist()
-    res = []
-    for i in range(len(label)):
-        res.append([video_id[i], index[i], ts[i], probs[i], predicts[i], label[i]])
-    return res
-
-def inference(args, model, data_loader, threshold):
-    model.eval()
-    res = []
-    with torch.no_grad():
-        with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
-            for ps in gen_batch(data_loader, executor, args, threshold):
-                for p in ps:
-                    t = p.result()
-                    res.extend(t)
-
-    return res
-
-def gen_batch(data_loader, executor, args, threshold):
-    cnt = 0
-    ps = []
-    for data_youtube8m, data_stft, label, video_id, index, ts in tqdm.tqdm(data_loader, total = len(data_loader)):
-        cnt += 1
-        ps.append(executor.submit(_inference, args, model,
-            data_youtube8m, data_stft, threshold,
-            video_id, index.numpy().tolist(), ts.numpy().tolist(), label.numpy().tolist()))
-        if cnt % args.max_worker == 0:
-            yield ps
-            ps = []
-    if cnt > 0:
-        yield ps
-
-def save(res, path):
+def save(res, path, threshold):
     obj = {}
     res = sorted(res, key=lambda x: (x[0], x[1]))
     with open(path, 'w') as fs:
@@ -70,8 +26,10 @@ def save(res, path):
             index = x[1]
             ts = x[2]
             prob = x[3]
-            predict = x[4]
-            label = x[5]
+            label = x[4]
+            predict = 0
+            if prob > threshold:
+                predict = 1
             if video_id not in obj:
                 if pre_video_id != '':
                     obj[pre_video_id]['annotations'].append({'segment': [s, e], 'labels': []})
@@ -86,18 +44,6 @@ def save(res, path):
         if pre_video_id != '' and s != e:
             obj[pre_video_id]['annotations'].append({'segment': [s, e], 'labels': []})
         json.dump(obj, fs)
-
-def val(res, threshold):
-    probs = [x[3] for x in res]
-    predicts = [1 if x[3] > threshold else 0 for x in res]
-    labels = [x[5] for x in res]
-    auc = sklearn.metrics.roc_auc_score(labels, probs)
-    acc = sklearn.metrics.accuracy_score(labels, predicts)
-    recall = sklearn.metrics.recall_score(labels, predicts)
-    precision = sklearn.metrics.precision_score(labels, predicts)
-    ap = sklearn.metrics.average_precision_score(labels, probs)
-    f1 = sklearn.metrics.f1_score(labels, predicts)
-    print('threshold: {}, auc: {}, acc: {}, recall: {}, precision: {}, ap: {}, f1: {}'.format(threshold, auc, acc, recall, precision, ap, f1))
 
 def load_model(args):
     model = LGSS(args)
@@ -129,16 +75,11 @@ def run(args, model):
         batch_size=20,
         shuffle=False)
 
-    '''
-    print('start val...')
-    res = inference(args, model, val_loader, 0.55)
-    save(res, os.path.join(args.result_dir, 'val'))
-    for threshold in np.arange(0, 1.05, 0.05).tolist():
-        val(res, threshold)
-    '''
-
     print('start inference...')
-    res = inference(args, model, test_loader, 0.98)
+    criterion = nn.CrossEntropyLoss(torch.Tensor([0.5, 5]))
+    if args.use_gpu == 1:
+        criterion = criterion.cuda()
+    res, total_loss = lgss_util.inference(args, model, test_loader, criterion)
     save(res, os.path.join(args.result_dir, 'test'))
 
 if __name__ == '__main__':
