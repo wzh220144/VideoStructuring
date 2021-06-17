@@ -308,13 +308,13 @@ def main():
     train_loader = DataLoader(
             SegDataset(train_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
             num_workers = 5,
-            prefetch_factor = 1,
+            prefetch_factor = 2,
             batch_size=args.batch_size, 
             shuffle=True)
     val_loader = DataLoader(
             SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
             num_workers = 5,
-            prefetch_factor = 1,
+            prefetch_factor = 2,
             batch_size=20, shuffle=False)
 
     model = LGSS(args)
@@ -325,9 +325,9 @@ def main():
         checkpoint = load_checkpoint(args.resume)
         model.load_state_dict(checkpoint['state_dict'])
 
-    optimizer = Adam(model.parameters(), lr = 0.005, weight_decay=0.1)
+    optimizer = Adam(model.parameters(), lr = 1e-3, weight_decay=5e-4)
     scheduler = MultiStepLR(optimizer, milestones = [5000, 10000, 30000])
-    criterion = nn.CrossEntropyLoss(torch.Tensor([0.05, 1]))
+    criterion = nn.CrossEntropyLoss(torch.Tensor([0.5, 5]))
     if args.use_gpu == 1:
         criterion = criterion.cuda()
 

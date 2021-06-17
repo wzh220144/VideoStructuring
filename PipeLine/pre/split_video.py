@@ -30,7 +30,7 @@ def split_video(video_dir, result_dir, split_dir, postfix, args):
                 for annotation in value['annotations']:
                     segment = annotation['segment']
                     target_path = os.path.join(split_dir, postfix, '{}#{:.2f}#{:.2f}#{}.mp4'.format(video_id, segment[0], segment[1], fps))
-                    if segment[0] == segment[1]:
+                    if segment[1] - segment[0] < 1e-5:
                         continue
                     cap = cv2.VideoCapture(target_path)
                     if not os.path.exists(target_path) or not cap.isOpened():

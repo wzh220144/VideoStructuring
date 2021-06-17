@@ -104,8 +104,8 @@ def load_model(args):
     if args.use_gpu == 1:
         model = model.cuda()
     model = nn.DataParallel(model)
-    #checkpoint = load_checkpoint(os.path.join(args.model_dir, 'model_best.pth.tar'), args)
-    checkpoint = load_checkpoint(os.path.join(args.model_dir, 'checkpoint.pth.tar'), args)
+    checkpoint = load_checkpoint(os.path.join(args.model_dir, 'model_best.pth.tar'), args)
+    #checkpoint = load_checkpoint(os.path.join(args.model_dir, 'checkpoint.pth.tar'), args)
     model.load_state_dict(checkpoint['state_dict'])
     return model
 
@@ -113,12 +113,14 @@ def run(args, model):
     test_samples_path = os.path.join(args.samples_dir, args.test_postfix)
     val_samples_path = os.path.join(args.samples_dir, args.train_postfix)
 
+    '''
     val_loader = DataLoader(
         SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False),
         num_workers=5,
         prefetch_factor=100,
         batch_size=20,
         shuffle=False)
+    '''
 
     test_loader = DataLoader(
         SegDataset(test_samples_path, args.extract_youtube8m, args.extract_stft, 'test_5k_A', args.feats_dir, False),
@@ -136,7 +138,7 @@ def run(args, model):
     '''
 
     print('start inference...')
-    res = inference(args, model, test_loader, 0.7)
+    res = inference(args, model, test_loader, 0.98)
     save(res, os.path.join(args.result_dir, 'test'))
 
 if __name__ == '__main__':
@@ -157,7 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('--youtube8m_dim', type=int, default=1024)
     parser.add_argument('--stft_dim', type=int, default=512)
     parser.add_argument('--lstm_hidden_size', type=int, default=512)
-    parser.add_argument('--window_size', type=int, default=10)
+    parser.add_argument('--window_size', type=int, default=5)
     parser.add_argument('--num_layers', type=int, default=1)
     parser.add_argument('--bidirectional', type=bool, default=True)
     parser.add_argument('--stft_feat_dim', type=int, default=512)
