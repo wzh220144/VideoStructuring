@@ -99,6 +99,7 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
             cnt = 0
 
         if batch_idx % 10000 == 0 and batch_idx != 0:
+        #if batch_idx % 10000 == 0:
             best_f1, best_threshold = test(args, model, val_loader, best_f1, best_threshold, criterion, epoch)
 
         scheduler.step()
@@ -148,15 +149,15 @@ def main():
 
     train_loader = DataLoader(
             SegDataset(train_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 5,
+            num_workers = 4,
             prefetch_factor = 2,
             batch_size=args.batch_size, 
             shuffle=True)
     val_loader = DataLoader(
             SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 5,
+            num_workers = 4,
             prefetch_factor = 2,
-            batch_size=20, shuffle=False)
+            batch_size=args.batch_size, shuffle=False)
 
     model = LGSS(args)
     if args.use_gpu == 1:

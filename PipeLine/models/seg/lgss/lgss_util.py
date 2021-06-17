@@ -48,12 +48,13 @@ def inference(args, model, data_loader, criterion):
                     t, loss = p.result()
                     res.extend(t)
                     total_loss += loss
+                    break
     return res, total_loss
 
 def val(res, threshold, total_loss, args):
     probs = [x[3] for x in res]
     predicts = [1 if x[3] > threshold else 0 for x in res]
-    labels = [x[5] for x in res]
+    labels = [x[4] for x in res]
     auc = sklearn.metrics.roc_auc_score(labels, probs)
     acc = sklearn.metrics.accuracy_score(labels, predicts)
     recall = sklearn.metrics.recall_score(labels, predicts, zero_division=1)
@@ -78,8 +79,7 @@ def val(res, threshold, total_loss, args):
             predict = 1
         if predict == 1:
             video_predicts[video_id].append(ts)
-    for k, v in res.items():
-        res[k] = sorted(v)
+    video_predicts = {k: sorted(v) for k, v in video_predicts.items()}
 
     video_true = {}
     annotation_dict = {}
@@ -90,7 +90,7 @@ def val(res, threshold, total_loss, args):
     pt = 0
     rt = 0
     for video_id in video_ids:
-        true_gts = [x['segment'][1] for x in annotation_dict['{}.mpt'.format(video_id)]['annotations'][:-1]]
+        true_gts = [x['segment'][1] for x in annotation_dict['{}.mp4'.format(video_id)]['annotations'][:-1]]
         predict_gts = video_predicts[video_id]
         t_id = 0
         p_id = 0
@@ -110,9 +110,14 @@ def val(res, threshold, total_loss, args):
                     t_id += 1
                 else:
                     p_id += 1
-    t1 = tp / pt
-    t2 = rt / pt
-    f1_w = 2 * t1 * t2 / (t1 + t2)
+    t1 = 0
+    if pt != 0:
+        t1 = tp / pt
+    t2 = tp / rt
+    f1_w = 0
+    if t1 + t2 > 0:
+        f1_w = 2 * t1 * t2 / (t1 + t2)
+    print(tp, pt, rt)
     return auc, acc, recall, precision, ap, f1, avg_loss, f1_w
 
 def gen_batch(data_loader, executor, args, model, criterion):
