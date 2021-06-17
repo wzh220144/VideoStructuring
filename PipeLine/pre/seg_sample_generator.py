@@ -9,8 +9,10 @@ from utils import utils
 import glob
 import tqdm
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import time
 
 def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft):
+    begin = time.time()
     cap = cv2.VideoCapture(video_file)
     video_id = video_file.split('/')[-1].split('.')[0]
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -23,11 +25,13 @@ def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extrac
         info['youtube8m'] = []
     if extract_stft:
         info['stft'] = []
+    duration = 0.0
     while True:
         has_frame, frame = cap.read()
         if not has_frame:
             break
         ts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+        duration = max(duration, ts)
         if cur_frame in frames:
             flag = True
             youtube8m_feat_path = ''
@@ -45,7 +49,8 @@ def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extrac
                     flag = False
                 stft_feat_path = '#{}#{}.npy'.format(cur_frame, cur_frame + fps)
             if not flag:
-                break
+                cur_frame += 1
+                continue
             info['index'].append(cur_frame)
             info['ts'].append(ts)
             if extract_youtube8m:
@@ -58,7 +63,11 @@ def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extrac
     info['h'] = h
     info['fps'] = fps
     info['id'] = video_id
+    info['duration'] = duration
+    info['frames'] = frame_count
     cap.release()
+    end = time.time()
+    duration =  float(frame_count) / float(ori_fps)
     return info
 
 def trans2id(labels, label_id_dict):
@@ -116,7 +125,7 @@ def gen_labels(info, label_id_dict, video_annotation):
 def do_gen_samples(args, info, window_size):
     l = len(info['index'])
     res = []
-    for cur in range(0, l): #第一个frame及最后一个frame不能作为准确sample
+    for cur in range(1, l - 1): #第一个frame及最后一个frame不能作为准确sample
         sample = {}
         b1 = list(range(max(0, cur - window_size), cur))
         b2 = list(range(cur, min(cur + window_size, l)))
@@ -135,7 +144,14 @@ def do_gen_samples(args, info, window_size):
     return res
 
 def _gen_samples(args, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict):
-    info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
+    video_info_file = video_file.replace('.mp4', '.info')
+    if os.path.exists(video_info_file):
+        with open(video_info_file, 'r') as fs:
+            info = json.load(fs)
+    else:
+        info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
+        with open(video_info_file, 'w') as fs:
+            json.dump(info, fs, ensure_ascii=False)
     #print(info)
     video_name = video_file.split('/')[-1]
     video_annotation = {}
@@ -155,9 +171,12 @@ def gen_samples(args, annotation_dict, label_id_dict, fps, window_size, feats_di
     res = []
     with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
         for video_file in tqdm.tqdm(video_files, total = len(video_files), desc = 'send task to pool'):
-            ps.append(executor.submit(_gen_samples, args, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
+            #ps.append(executor.submit(_gen_samples, args, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
+            res.extend(_gen_samples(args, video_file, fps, window_size, label_id_dict, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft, annotation_dict))
+        '''
         for p in tqdm.tqdm(ps, total = len(ps), desc = 'gen samples'):
             res.extend(p.result())
+        '''
     return res
 
 def parse_label_id(path):
@@ -223,10 +242,15 @@ if __name__ == "__main__":
             else:
                 val_samples.append(sample)
         random.shuffle(train_samples)
+        '''
         with open(args.samples_dir + '/{}'.format(args.train_postfix), 'w') as scene_train_fs:
             write_samples(train_samples, scene_train_fs)
         with open(args.samples_dir + '/val_{}'.format(args.train_postfix), 'w') as scene_val_fs:
             write_samples(val_samples, scene_val_fs)
+        with open(args.samples_dir + '/val_annotation.txt', 'w') as val_annotation_fs:
+            obj = [annotation_dict[i + '.mp4'] for i in val_ids]
+            json.dump(obj, val_annotation_fs, ensure_ascii=False)
+        '''
     elif args.mode == 2:
         samples = gen_samples(args, {}, label_id_dict, 
                          args.fps, args.window_size, args.feats_dir,

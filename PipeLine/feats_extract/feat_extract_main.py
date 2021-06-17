@@ -38,7 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_worker', type=int, default=30)
     parser.add_argument('--fps', type=int, default=5)
     parser.add_argument('--use_gpu', type=bool, default=True)
-    parser.add_argument('--device', type=str, default='1')
+    parser.add_argument('--device', type=str, default='0')
     args = parser.parse_args()
 
     youtube8m_folder = args.feat_dir + '/youtube8m'
@@ -88,7 +88,7 @@ if __name__ == '__main__':
                                       youtube8m_dir, resnet50_dir,
                                       vggish_dir, stft_dir,
                                       ocr_dir, asr_dir))
-            #process_file(gen, file_path, video_path, audio_path, ocr_path, asr_path)
+            #process_file(gens[t], file_path, args.split_dir, args.fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir)
         for p in tqdm.tqdm(ps, total=len(ps), desc='feat extract'):
             p.result()
             end_time = time.time()

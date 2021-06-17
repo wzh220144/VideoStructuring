@@ -16,7 +16,6 @@ from pydub import AudioSegment
 BASE = "/home/tione/notebook/VideoStructuring"
 PCA_PARAMS_PATH = BASE + "/pretrained/vggfish/vggish_pca_params.npz"
 VGGISH_CHECKPOINT_PATH = BASE + "/pretrained/vggfish/vggish_model.ckpt"
-os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
 
 class MultiModalFeatureExtract(object):
 
