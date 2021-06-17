@@ -62,17 +62,12 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
         cnt += 1
 
         if cnt % 100 == 0:
-            labels = []
-            preds = []
-            probs = []
-            total_loss = 0
-            cnt = 0
             acc = sklearn.metrics.accuracy_score(labels, preds)
             recall = sklearn.metrics.recall_score(labels, preds, zero_division=1)
             precision = sklearn.metrics.precision_score(labels, preds, zero_division=1)
             auc = sklearn.metrics.roc_auc_score(labels, probs)
             ap = sklearn.metrics.average_precision_score(labels, probs)
-            f1 = sklearn.metrics.f1_score(labels, probs, zero_division=1)
+            f1 = sklearn.metrics.f1_score(labels, preds, zero_division=1)
 
             writer.add_scalar('train/loss', total_loss / cnt, train_iter)
             writer.add_scalar('train/auc', auc, train_iter)
@@ -97,6 +92,12 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
                 ap,
                 f1,
                 ))
+            labels = []
+            preds = []
+            probs = []
+            total_loss = 0
+            cnt = 0
+
         if batch_idx % 10000 == 0 and batch_idx != 0:
             best_f1, best_threshold = test(args, model, val_loader, best_f1, best_threshold, criterion, epoch)
 
