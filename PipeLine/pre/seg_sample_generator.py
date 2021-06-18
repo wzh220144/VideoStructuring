@@ -242,7 +242,6 @@ if __name__ == "__main__":
             else:
                 val_samples.append(sample)
         random.shuffle(train_samples)
-        '''
         with open(args.samples_dir + '/{}'.format(args.train_postfix), 'w') as scene_train_fs:
             write_samples(train_samples, scene_train_fs)
         with open(args.samples_dir + '/val_{}'.format(args.train_postfix), 'w') as scene_val_fs:
@@ -250,7 +249,6 @@ if __name__ == "__main__":
         with open(args.samples_dir + '/val_annotation.txt', 'w') as val_annotation_fs:
             obj = [annotation_dict[i + '.mp4'] for i in val_ids]
             json.dump(obj, val_annotation_fs, ensure_ascii=False)
-        '''
     elif args.mode == 2:
         samples = gen_samples(args, {}, label_id_dict, 
                          args.fps, args.window_size, args.feats_dir,

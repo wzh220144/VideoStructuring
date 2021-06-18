@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--extract_asr', type=bool, default=False)
     parser.add_argument('--extract_ocr', type=bool, default=False)
     parser.add_argument('--max_worker', type=int, default=30)
-    parser.add_argument('--fps', type=int, default=5)
+    parser.add_argument('--fps', type=int, default=10)
     parser.add_argument('--use_gpu', type=bool, default=True)
     parser.add_argument('--device', type=str, default='0')
     args = parser.parse_args()
