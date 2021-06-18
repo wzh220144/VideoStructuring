@@ -241,6 +241,7 @@ class MultiModalFeatureExtract(object):
                     r_time.append(ts)
                     #progress_bar.update(1)
                     count += 1
+                    self.error_log.write('{} do not exist.\n'.format(t))
                 else:
                     self.error_log.write('{} exist.\n'.format(t))
             if count == batch_size:
