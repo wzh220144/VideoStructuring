@@ -277,3 +277,6 @@ class MultiModalFeatureExtract(object):
                 #progress_bar.update(count)
         #progress_bar.update(count)
         #progress_bar.close()
+        if cur_index in frames:
+            if cur_index > pre_index:
+                yield pre_index, cur_index, pre, cur
