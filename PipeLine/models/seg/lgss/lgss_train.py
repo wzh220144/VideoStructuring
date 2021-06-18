@@ -47,12 +47,12 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
         output = output.view(-1, 2)
         loss = criterion(output, label)
         loss.backward()
-        prob = functional.softmax(output, dim=1)[:, 1].cpu().detach().numpy()
-        pred = np.nan_to_num(prob) > 0.5
         optimizer.step()
         train_iter += 1
 
-        _label = label.cpu().detach().numpy().tolist()
+        prob = functional.softmax(output, dim=1)[:, 1].detach().cpu().numpy()
+        pred = np.nan_to_num(prob) > 0.5
+        _label = label.cpu().numpy().tolist()
         _pred = pred.tolist()
         _prob = prob.tolist()
         preds.extend(_pred)
@@ -98,7 +98,7 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
             total_loss = 0
             cnt = 0
 
-        if batch_idx % 10000 == 0 and batch_idx != 0:
+        if batch_idx % 1000 == 0 and batch_idx != 0:
         #if batch_idx % 10000 == 0:
             best_f1, best_threshold = test(args, model, val_loader, best_f1, best_threshold, criterion, epoch)
 
@@ -149,15 +149,15 @@ def main():
 
     train_loader = DataLoader(
             SegDataset(train_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 4,
-            prefetch_factor = 2,
+            num_workers = 3,
+            prefetch_factor = 1,
             batch_size=args.batch_size, 
             shuffle=True)
     val_loader = DataLoader(
             SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 4,
-            prefetch_factor = 2,
-            batch_size=args.batch_size, shuffle=False)
+            num_workers = 5,
+            prefetch_factor = 1,
+            batch_size=20, shuffle=False)
 
     model = LGSS(args)
     if args.use_gpu == 1:
@@ -168,7 +168,7 @@ def main():
         model.load_state_dict(checkpoint['state_dict'])
 
     optimizer = Adam(model.parameters(), lr = 1e-3, weight_decay=5e-4)
-    scheduler = MultiStepLR(optimizer, milestones = [5000, 10000, 30000])
+    scheduler = MultiStepLR(optimizer, milestones = [10000, 50000, 100000])
     criterion = nn.CrossEntropyLoss(torch.Tensor([0.5, 5]))
     if args.use_gpu == 1:
         criterion = criterion.cuda()
