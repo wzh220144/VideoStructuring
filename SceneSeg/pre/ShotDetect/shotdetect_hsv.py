@@ -44,16 +44,6 @@ def main(args, video_path, data_root):
             with open(stats_file_path, 'r') as stats_file:
                 stats_manager.load_from_csv(stats_file, base_timecode)
 
-        # Set begin and end time
-        if args.begin_time is not None:
-            start_time = base_timecode + args.begin_time
-            end_time = base_timecode + args.end_time
-            video_manager.set_duration(start_time=start_time, end_time=end_time)
-        elif args.begin_frame is not None:
-            start_frame = base_timecode + args.begin_frame
-            end_frame = base_timecode + args.end_frame
-            video_manager.set_duration(start_time=start_frame, end_time=end_frame)
-            pass
         # Set downscale factor to improve processing speed.
         if args.keep_resolution:
             video_manager.set_downscale_factor(1)
@@ -79,18 +69,19 @@ def main(args, video_path, data_root):
         # Save keyf img for each shot
         if args.save_keyf:
             output_dir = osp.join(data_root, "shot_keyf", video_prefix)
-            generate_images(video_manager, shot_list, output_dir)
+            generate_images(video_manager, shot_list, output_dir, num_images=5)
         
         # Save keyf txt of frame ind
         if args.save_keyf_txt:
             output_dir = osp.join(data_root, "shot_txt", "{}.txt".format(video_prefix))
             mkdir_ifmiss(osp.join(data_root, "shot_txt"))
-            generate_images_txt(shot_list, output_dir)
+            generate_images_txt(shot_list, output_dir, num_images=5)
 
         # Split video into shot video
         if args.split_video:
             output_dir = osp.join(data_root, "shot_split_video", video_prefix)
-            split_video_ffmpeg([video_path], shot_list, output_dir, suppress_output=True)
+            if not len(shot_list) == len(glob.glob(output_dir+'/*.mp4')):
+                split_video_ffmpeg([video_path], shot_list, output_dir, suppress_output=True)
             if not len(shot_list) == len(glob.glob(output_dir+'/*.mp4')):
                 os.system(" ".join(["rm", "-rf", output_dir]))
 
@@ -104,17 +95,13 @@ def main(args, video_path, data_root):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Single Video ShotDetect")
-    parser.add_argument('--video_dir', type=str, default=None)
-    parser.add_argument('--save_dir', type=str, default="../data/shotdet_results", help="path to the saved data")
+    parser.add_argument('--video_dir', type=str, default='/home/tione/notebook/dataset/videos/train_5k_A')
+    parser.add_argument('--save_dir', type=str, default="/home/tione/notebook/dataset/videos/train_5k_A/shot_hsv", help="path to the saved data")
     parser.add_argument('--print_result', type = bool, default=True) #action="store_true")
     parser.add_argument('--save_keyf', type = bool, default=True) #      action="store_true")
     parser.add_argument('--save_keyf_txt', type = bool, default=True) #  action="store_true")
     parser.add_argument('--split_video', type = bool, default=True) #    action="store_true")
-    parser.add_argument('--keep_resolution', action="store_true")
-    parser.add_argument('--begin_time',  type=float, default=None,  help="float: timecode")
-    parser.add_argument('--end_time',    type=float, default=120.0, help="float: timecode")
-    parser.add_argument('--begin_frame', type=int,   default=None,  help="int: frame")
-    parser.add_argument('--end_frame',   type=int,   default=1000,  help="int: frame")
+    parser.add_argument('--keep_resolution', type = bool, default=False)
     args = parser.parse_args()
     
     '''
