@@ -144,7 +144,7 @@ def main(cfg, model, args, video_name):
         
 def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
-    parser.add_argument('--config', help='config file path', default = 'config/common_test.py')
+    parser.add_argument('--config', help='config file path', default = 'config/inference_hsv.py')
     parser.add_argument('--data_root', help='data root', default = '')
     parser.add_argument('--video_dir', help='test video dir', default = None)
     parser.add_argument('--model_path', help='model root', default = None)
