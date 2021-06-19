@@ -65,16 +65,15 @@ def match_shot_scene_boundary(save_dir, shot_dict, scene_dict):
              
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--video_dir', type = str, default = "../data/train799/video")
-    parser.add_argument('--data_root', type = str, default = "../data/train799")
-    parser.add_argument('--input_annotation', type = str, default = "../../dataset/gt_json/train799.json")
+    parser.add_argument('--video_dir', type = str, default = "/home/tione/notebook/dataset/videos/train_5k_A")
+    parser.add_argument('--data_root', type = str, default = "/home/tione/notebook/dataset/train_5k_A/shot_hsv")
+    parser.add_argument('--input_annotation', type = str, default = "/home/tione/notebook/dataset/GroundTruth/train5k.txt")
     args = parser.parse_args()
     print(args)
 
     shot_dict = {}
     for video_file in glob.glob(args.video_dir + "/*.mp4"):
         video_id = video_file.split('/')[-1].split(".mp4")[0]
-        video_stats_path = os.path.join(args.data_root, "shot_stats", video_id+".csv")
         video_shot_txt = os.path.join(args.data_root, "shot_txt", video_id+".txt")
         if not os.path.exists(os.path.join(args.data_root, "shot_split_video", video_id)):
             print("{} not exists".format(os.path.join(args.data_root, "shot_split_video", video_id)))
