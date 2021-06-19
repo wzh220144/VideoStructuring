@@ -1,0 +1,2 @@
+python -u /home/tione/notebook/VideoStructuring/SceneSeg/pre/gt_generator.py --video_dir /home/tione/notebook/dataset/videos/train_5k_A --data_root /home/tione/notebook/dataset/train_5k_A/shot_hsv --input_annotation /home/tione/notebook/dataset/structuring/GroundTruth/train5k.txt
+python -u /home/tione/notebook/VideoStructuring/SceneSeg/pre/gt_generator.py --video_dir /home/tione/notebook/dataset/videos/test_5k_2nd --data_root /home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2 --input_annotation /home/tione/notebook/dataset/structuring/GroundTruth/train5k.txt

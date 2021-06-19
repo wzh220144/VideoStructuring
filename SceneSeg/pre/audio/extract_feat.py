@@ -123,10 +123,9 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Audio feature using stft")
-    parser.add_argument('--data_root', type=str, default="../data/ad300")
+    parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/videos/train_5k_A/shot_hsv")
     parser.add_argument('--replace_old', action="store_true",help='rewrite exisiting wav and feature')
     parser.add_argument('-nw','--max_workers', type=int, default=80,help='number of processors.')
-    parser.add_argument('--duration_time',type=float,default=0.2)
     args = parser.parse_args()
     #args.list_file = osp.join(args.data_root,'meta/list_test.txt')
     args.list_file = None
