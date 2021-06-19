@@ -35,6 +35,7 @@ class Preprocessor(data.Dataset):
         self.data_dict = data_dict
         self.fps_dict = {}
         self.shot_frames = {}
+        self.frame_count_dict = {}
         video_ids = set([])
         for x in self.listIDs:
             for xx in x:
@@ -43,6 +44,9 @@ class Preprocessor(data.Dataset):
         for video_id in video_ids:
             txt_path = os.path.join(shot_txt_dir, '{}.txt'.format(video_id))
             video_path = os.path.join(cfg.video_dir, '{}.mp4'.format(video_id))
+            cap = cv2.VideoCapture(video_path)
+            self.frame_count_dict[video_id] = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            cap.release()
             if os.path.exists(txt_path):
                 with open(txt_path, 'r') as f:
                     for index, line in enumerate(f):
@@ -177,9 +181,9 @@ def get_train_data(cfg):
     imdbidlist_json, annos_dict, annos_valid_dict, casts_dict, acts_dict = train_data_utils.data_pre(cfg)
     partition = train_data_utils.data_partition(cfg, imdbidlist_json, annos_valid_dict)
     data_dict = {"annos_dict": annos_dict, "casts_dict": casts_dict, "acts_dict": acts_dict}
-    train_set = Preprocessor(cfg, partition['train'], data_dict)
-    val_set = Preprocessor(cfg, partition['val'], data_dict)
-    return train_set, val_set
+    train_data = Preprocessor(cfg, partition['train'], data_dict)
+    val_data = Preprocessor(cfg, partition['val'], data_dict)
+    return train_data, val_data
 
 def get_inference_data(cfg, video_names):
     data = inference_data_util.get_data(cfg, video_names)

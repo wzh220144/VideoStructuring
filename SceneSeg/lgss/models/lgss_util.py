@@ -7,6 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import math
 import torch.nn.functional as F
+import sklearn
+import sklearn.metrics
 
 def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids):
     total_loss = 0
@@ -43,10 +45,10 @@ def inference(cfg, args, model, data_loader, criterion):
             total_loss += loss
     return res, total_loss
 
-def val(res, threshold, total_loss, args):
-    probs = [x[3] for x in res]
-    predicts = [1 if x[3] > threshold else 0 for x in res]
-    labels = [x[4] for x in res]
+def val(res, threshold, total_loss, args, fps_dict):
+    probs = [x[1] for x in res]
+    predicts = [1 if x[1] >= threshold else 0 for x in res]
+    labels = [x[0] for x in res]
     auc = sklearn.metrics.roc_auc_score(labels, probs)
     acc = sklearn.metrics.accuracy_score(labels, predicts)
     recall = sklearn.metrics.recall_score(labels, predicts, zero_division=1)
@@ -58,16 +60,14 @@ def val(res, threshold, total_loss, args):
     video_ids = set([])
     video_predicts = {}
     for x in res:
-        video_id = x[0]
+        video_id = x[3]
         video_ids.add(video_id)
-        index = x[1]
-        ts = x[2]
-        prob = x[3]
-        label = x[4]
+        ts = float(x[2]) / fps_dict[video_id]
+        prob = x[1]
         if video_id not in video_predicts:
             video_predicts[video_id] = []
         predict = 0
-        if prob > threshold:
+        if prob >= threshold:
             predict = 1
         if predict == 1:
             video_predicts[video_id].append(ts)
