@@ -3,18 +3,17 @@ from __future__ import print_function
 from mmcv import Config
 from tensorboardX import SummaryWriter
 
-import src.models as models
+import lgss.models as models
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from src import get_data
+from lgss.data.get_data import get_data
 from torch.utils.data import DataLoader
-from utilis import (cal_MIOU, cal_Recall, cal_Recall_time, get_ap, get_mAP_seq,
+from lgss.utilis import (cal_MIOU, cal_Recall, cal_Recall_time, get_ap, get_mAP_seq,
                     load_checkpoint, mkdir_ifmiss, pred2scene, save_checkpoint,
                     save_pred_seq, scene2video, to_numpy, write_json)
 from utilis.package import *
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
@@ -179,32 +178,6 @@ def main():
             save_checkpoint({
                 'state_dict': model.state_dict(), 'epoch': epoch + 1,
             }, is_best=is_best, fpath=osp.join(cfg.logger.logs_dir, 'checkpoint.pth.tar'))
-
-    if cfg.testFlag:
-        print('...test with saved model')
-        checkpoint = load_checkpoint(
-            osp.join(cfg.logger.logs_dir, 'model_best.pth.tar'))
-        model.load_state_dict(checkpoint['state_dict'])
-        gts, preds = test(cfg, model, test_loader, criterion, mode='test_final')
-        save_pred_seq(cfg, test_loader, gts, preds)
-        if cfg.shot_frm_path is not None:
-            Miou = cal_MIOU(cfg, threshold=0.5)
-            Recall = cal_Recall(cfg, threshold=0.5)
-            Recall_time = cal_Recall_time(cfg, recall_time=3, threshold=0.5)
-            final_dict.update(
-                {"Miou": Miou, "Recall": Recall, "Recall_time": Recall_time})
-        else:
-            print('...there is no correspondence file '
-                  'between shots and their frames')
-        log_dict = {'cfg': cfg.__dict__['_cfg_dict'], 'final': final_dict}
-        write_json(osp.join(cfg.logger.logs_dir, "log.json"), log_dict)
-
-        if cfg.dataset.name == "demo":
-            print('...visualize scene video in demo mode, '
-                  'the above quantitive metrics are invalid')
-            scene_dict, scene_list = pred2scene(cfg, threshold=0.7)
-            scene2video(cfg, scene_list)
-
 
 if __name__ == '__main__':
     main()

@@ -3,19 +3,20 @@ from __future__ import print_function
 from mmcv import Config
 from tensorboardX import SummaryWriter
 
-import src.models as models
+import lgss.models as models
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from src import get_data
+from lgss.data.get_data import get_data
 from torch.utils.data import DataLoader
-from utilis import (cal_MIOU, cal_Recall, cal_Recall_time, get_ap, get_mAP_seq,
+from lgss.utilis import (cal_MIOU, cal_Recall, cal_Recall_time, get_ap, get_mAP_seq,
                     load_checkpoint, mkdir_ifmiss, pred2scene, save_checkpoint,
                     save_pred_seq, scene2video, to_numpy, write_json)
 from utilis.package import *
 import glob
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
+import json
 
 
 final_dict = {}
@@ -105,10 +106,7 @@ def test(cfg, model, test_loader, criterion, args, mode='test'):
         return gts, preds
 
 def load_model(cfg, args):
-    if args.use_gpu == 1:
-        model = models.__dict__[cfg.model.name](cfg).cuda()
-    else:
-        model = models.__dict__[cfg.model.name](cfg)
+    model = models.__dict__[cfg.model.name](cfg).cuda()
     model = nn.DataParallel(model)
     checkpoint = load_checkpoint(cfg.model_path, args.use_gpu)
     model.load_state_dict(checkpoint['state_dict'])
@@ -128,15 +126,10 @@ def main(cfg, model, args, video_name):
                 scene2video(cfg, scene_list, args, video_name)
         return
     print(logs_dir + '/pred_scene.json not exist.')
-    _, testSet, _ = get_data(cfg, video_name)
-    test_loader = DataLoader(
-                    testSet, batch_size=cfg.batch_size,
-                    shuffle=False, **cfg.data_loader_kwargs)
-    if args.use_gpu == 1:
-        criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
-    else:
-        criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight))
-    gts, preds = test(cfg, model, test_loader, criterion, args, mode='test_final')
+    all_set = get_data(cfg, video_name)
+    data_loader = DataLoader(all_set, batch_size=cfg.batch_size, shuffle=False, **cfg.data_loader_kwargs, num_workers=3)
+    criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
+    gts, preds = test(cfg, model, data_loader, criterion, args, mode='test_final')
     save_pred_seq(cfg, test_loader, gts, preds, logs_dir)
     print('...visualize scene video in demo mode', 'the above quantitive metrics are invalid')
     scene_dict, scene_list = pred2scene(cfg, 0.65, video_name, logs_dir)
@@ -144,28 +137,18 @@ def main(cfg, model, args, video_name):
         
 def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
-    parser.add_argument('--config', help='config file path', default = 'config/inference_hsv.py')
-    parser.add_argument('--data_root', help='data root', default = '')
-    parser.add_argument('--video_dir', help='test video dir', default = None)
-    parser.add_argument('--model_path', help='model root', default = None)
-    parser.add_argument('--output_root', default = '')
+    parser.add_argument('--config', help='config file path', default = '/home/tione/notebook/VideoStructuring/SceneSeg/config/inference_hsv.py')
     parser.add_argument('--max_workers', type=int, default = 20)
     parser.add_argument('--use_gpu', type=int, default = 1)
-    
     args = parser.parse_args()
     return args
 
 if __name__ == '__main__':
     args = parse_args()
     cfg = Config.fromfile(args.config)
-    if args.use_gpu == 1:
-        os.environ["CUDA_VISIBLE_DEVICES"] = cfg.gpus    
+    os.environ["CUDA_VISIBLE_DEVICES"] = cfg.gpus
     assert cfg.testFlag, "testFlag must be True"
-    cfg.data_root = args.data_root if args.data_root is not None else cfg.data_root
-    cfg.video_dir = args.video_dir
-    cfg.model_path = args.model_path if args.model_path is not None else cfg.model_path
-    cfg.shot_frm_path = os.path.join(cfg.data_root, 'shot_txt')
-    
+
     model = load_model(cfg, args)
     print('model complete')
     print(args.video_dir)
@@ -175,6 +158,5 @@ if __name__ == '__main__':
         for video_path in glob.glob(os.path.join(args.video_dir,'*.mp4')):
             video_name = os.path.basename(video_path).split(".m")[0]
             results.append(executor.submit(main, cfg, model, args, video_name))
-            #main(cfg, model, args, video_name)
         results = [res.result() for res in results]
     print('done')

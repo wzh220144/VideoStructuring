@@ -1,7 +1,9 @@
 experiment_name = "train_hsv"
 experiment_description = "scene segmentation with all modality"
 # overall confg
-data_root = '/home/tione/notebook/dataset/videos/train_5k_A/shot_hsv/'
+data_root = '/home/tione/notebook/dataset/train_5k_A/shot_hsv'
+video_dir = '/home/tione/notebook/dataset/videos/train_5k_A'
+model_path = '/home/tione/notebool/dataset/model/seg/shot_hsv'
 shot_frm_path = data_root + "/shot_txt"
 shot_num = 4  # even
 seq_len = 2  # even
@@ -9,7 +11,7 @@ gpus = "0,1"
 
 # dataset settings
 dataset = dict(
-    name="all",
+    name="train",
     mode=['place', 'aud'],
 )
 # model settings
@@ -23,7 +25,8 @@ model = dict(
     aud=dict(cos_channel=512),
     bidirectional=True,
     lstm_hidden_size=512,
-    ratio=[0.8, 0, 0, 0.2]
+    ratio=[0.8, 0, 0, 0.2],
+    num_layers=1,
     )
 
 # optimizer

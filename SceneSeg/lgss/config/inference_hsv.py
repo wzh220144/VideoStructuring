@@ -2,8 +2,11 @@ experiment_name = "inference_hsv_log"
 experiment_description = "scene segmentation using images only"
 
 # overall confg
-data_root = '/home/tione/notebook/dataset/videos/test_5k_2nd/shot_hsv/'
-shot_frm_path = data_root + "/shot_txt"  
+data_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_hsv'
+video_dir = '/home/tione/notebook/dataset/videos/test_5k_2nd'
+model_path = '/home/tione/notebool/dataset/model/seg/shot_hsv'
+output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_hsv_output'
+shot_frm_path = data_root + "/shot_txt"
 video_name = "test"
 shot_num = 4
 seq_len = 2
@@ -11,7 +14,7 @@ gpus = "0"
 
 # dataset settings
 dataset = dict(
-    name="demo",
+    name="inference",
     mode=['place', 'aud'],
 )
 # model settings
@@ -25,7 +28,8 @@ model = dict(
     sim_channel=512,  # dim of similarity vector
     bidirectional=True,
     lstm_hidden_size=512,
-    ratio=[0.8,0, 0, 0.2]
+    ratio=[0.8,0, 0, 0.2],
+    num_layers=1,
     )
 
 # optimizer
