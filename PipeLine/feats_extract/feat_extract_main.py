@@ -13,11 +13,12 @@ import tensorflow as tf
 import random
 
 
-def process_file(gen, file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir):
+def process_file(index, device, gen, file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir):
     if not os.path.exists(file_path):
         return
     try:
-        gen.extract_feat(file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir, True)
+        with tf.device('/gpu:{}'.format(device)):
+            gen.extract_feat(file_path, split_dir, fps, youtube8m_dir, resnet50_dir, vggish_dir, stft_dir, ocr_dir, asr_dir, True)
     except Exception as e:
         print(file_path, traceback.format_exc())
 
@@ -28,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--postfix', default='mp4', type=str)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/feats/train_5k_A')
-    parser.add_argument('--split_dir', default='/home/tione/notebook/dataset/split/train_5k_A')
+    parser.add_argument('--shot_dir', default='/home/tione/notebook/dataset/shot/train_5k_A')
     parser.add_argument('--extract_youtube8m', type=bool, default=True)
     parser.add_argument('--extract_resnet50', type=bool, default=False)
     parser.add_argument('--extract_vggish', type=bool, default=False)
@@ -38,8 +39,19 @@ if __name__ == '__main__':
     parser.add_argument('--max_worker', type=int, default=30)
     parser.add_argument('--fps', type=int, default=10)
     parser.add_argument('--use_gpu', type=bool, default=True)
-    parser.add_argument('--device', type=str, default='0')
+    parser.add_argument('--device', type=str, default='0,1')
+    parser.add_argument('--mode', type=int, default=1)    #1: same interval, 2: shot with transnet, 3: shot with hsv
     args = parser.parse_args()
+
+    shot_dir = args.shot_dir
+
+    if args.mode == 1:
+        shot_dir = args.shot_dir + '/same_interval'
+    elif args.mode == 2:
+        shot_dir = args.shot_dir + '/transnet'
+    elif args.mode == 3:
+        shot_dir = args.shot_dir + '/hsv'
+
 
     youtube8m_folder = args.feat_dir + '/youtube8m'
     resnet50_folder = args.feat_dir + '/resnet50'
@@ -47,7 +59,7 @@ if __name__ == '__main__':
     stft_folder = args.feat_dir + '/stft'
     ocr_folder = args.feat_dir + '/ocr'
     asr_folder = args.feat_dir + '/asr'
-    os.makedirs(args.split_dir, exist_ok=True)
+    os.makedirs(shot_dir, exist_ok=True)
     os.makedirs(args.feat_dir, exist_ok=True)
     os.makedirs(youtube8m_folder, exist_ok=True)
     os.makedirs(resnet50_folder, exist_ok=True)
@@ -58,7 +70,8 @@ if __name__ == '__main__':
 
     gens = []
     os.environ["CUDA_VISIBLE_DEVICES"]=args.device
-    for device in ['0']:
+    devices = args.device.split(',')
+    for device in devices:
         with tf.device('/gpu:{}'.format(device)):
             gens.append(MultiModalFeatureExtract(batch_size=args.batch_size,
                                                  extract_youtube8m=args.extract_youtube8m,
@@ -83,8 +96,8 @@ if __name__ == '__main__':
             stft_dir = os.path.join(stft_folder, vid)
             ocr_dir = os.path.join(ocr_folder, vid)
             asr_dir = os.path.join(asr_folder, vid)
-            t = random.randint(0, 0)
-            ps.append(executor.submit(process_file, gens[t], file_path, args.split_dir, args.fps,
+            t = random.randint(0, len(devices) - 1)
+            ps.append(executor.submit(process_file, t, devices[t], gens[t], file_path, shot_dir, args.fps,
                                       youtube8m_dir, resnet50_dir,
                                       vggish_dir, stft_dir,
                                       ocr_dir, asr_dir))

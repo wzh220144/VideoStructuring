@@ -113,6 +113,7 @@ pip install tensorflow-gpu==1.14 opencv-python librosa==0.7.2 tensorboardX==2.1 
 pip install mmcv -i http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com
 pip install numba==0.48.0
 pip install cachetools
+pip install pydub
 
 # tensorflow 1.15 - solve problem - https://stackoverflow.com/questions/58479556/notimplementederror-cannot-convert-a-symbolic-tensor-2nd-target0-to-a-numpy
 # pip config set global.index-url https://mirrors.tencent.com/pypi/simple/

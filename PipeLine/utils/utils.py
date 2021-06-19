@@ -57,6 +57,13 @@ def trans2audio(video_file, audio_file):
         command = 'ffmpeg -loglevel error -i '+ video_file + ' ' + audio_file
     return os.system(command)
 
+def format_time(ts):
+    hrs = int(ts / 3600)
+    ts -= (hrs * 3600)
+    mins = int(ts / 60)
+    ts -= (mins * 60)
+    return '{:02d}:{:02d}:{:.2f}'.format(hrs, mins, ts)
+
 def split_video(i, start_frame, end_frame, fps, video_file, split_dir, log = None,
                        arg_override = '-crf 21', hide_progress = False, suppress_output = True):
     video_id = video_file.split('/')[-1].split('.')[0]
@@ -64,12 +71,13 @@ def split_video(i, start_frame, end_frame, fps, video_file, split_dir, log = Non
     os.makedirs(split_dir, exist_ok=True)
     split_video_file = '{}/{}#{}#{}#{}.mp4'.format(split_dir, i, start_frame, end_frame, int(fps))
     split_audio_file = '{}/{}#{}#{}#{}.wav'.format(split_dir, i, start_frame, end_frame, int(fps))
+    flag = False
     if os.path.exists(split_video_file):
         if log != None:
-            log.write('{} exist.'.format(split_video_file))
+            log.write('{} exist.\n'.format(split_video_file))
     else:
         if log != None:
-            log.write('{} does not exist.'.format(split_video_file))
+            log.write('{} does not exist.\n'.format(split_video_file))
         duration = (end_frame - start_frame - 1) / fps
         call_list = ['ffmpeg']
         if suppress_output:
@@ -79,7 +87,7 @@ def split_video(i, start_frame, end_frame, fps, video_file, split_dir, log = Non
         call_list += [
             '-y',
             '-ss',
-            start_frame / fps,
+            format_time(start_frame / fps),
             '-i',
             video_file
         ]
@@ -89,20 +97,38 @@ def split_video(i, start_frame, end_frame, fps, video_file, split_dir, log = Non
             '-strict',
             '-2',
             '-t',
-            duration,
+            format_time(duration),
             '-sn',
             split_video_file]
         ret_val = subprocess.call(call_list)
         if ret_val != 0:
             if log != None:
-                log.write('split {} failed.'.format(split_video_file))
+                log.write('split {} failed.\n'.format(split_video_file))
     if os.path.exists(split_audio_file):
         if log != None:
-            log.write('{} exist.'.format(split_audio_file))
+            log.write('{} exist.\n'.format(split_audio_file))
     else:
         if not os.path.exists(split_video_file):
             if log != None:
-                log.write('trans {} failed: {} does not exist.'.format(split_audio_file, split_video_file))
+                log.write('trans {} failed: {} does not exist.\n'.format(split_audio_file, split_video_file))
         else:
-            ret = trans2audio(split_video_file, split_audio_file) != 0
-            log.write('trans {} failed, ret code: {}'.format(split_audio_file, ret))
+            ret = trans2audio(split_video_file, split_audio_file) == 0
+            if not ret:
+                log.write('trans {} failed, ret code: {}\n'.format(split_audio_file, ret))
+    flag = os.path.exists(split_video_file) and os.path.exists(split_audio_file)
+    return split_video_file, split_audio_file, flag
+
+def read_shot_info(video_file, shot_dir):
+    frames = set([])
+    split_video_files = []
+    split_audio_files = []
+    flag = False
+    video_id = video_file.split('/')[-1].split('.')[0]
+    info_file = '{}/{}.info'.format(shot_dir, video_id)
+    if os.path.exists(info_file):
+        with open(info_file, 'r') as f:
+            flag = True
+            frames = set(f.readline().strip('\n').split(' '))
+            split_video_files = f.readline().strip('\n').split('\t')
+            split_audio_files = f.readline().strip('\n').split('\t')
+    return frames, split_video_files, split_audio_files, flag

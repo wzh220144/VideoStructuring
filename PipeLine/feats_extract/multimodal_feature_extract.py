@@ -180,7 +180,7 @@ class MultiModalFeatureExtract(object):
             end_time = time.time()
             print("{}: resnet50 extract cost {} sec".format(video_file, end_time - start_time))
 
-    def extract_feat(self, video_file, split_dir, sample_fps,
+    def extract_feat(self, video_file, shot_dir, sample_fps,
                      youtube8m_dir=None, resnet50_dir=None,
                      vggish_dir=None, stft_dir=None,
                      ocr_dir=None, asr_dir=None,
@@ -188,27 +188,16 @@ class MultiModalFeatureExtract(object):
         cap = cv2.VideoCapture(video_file)
         frame_count, fps, h, w = utils.read_video_info(cap)
         cap.release()
+    
+        frames, split_video_files, split_audio_files, flag = utils.read_shot_info(video_file, shot_dir)
 
-        frames = utils.get_frames_same_interval(frame_count, sample_fps)
-        #print('{} has {} frames, sample {} frames.'.format(video_file, frame_count, len(frames)))
-        split_video_files, split_audio_files = self.split_video(video_file, frames, split_dir, frame_count, fps)
-
-        self.extract_youtube8m_feat(video_file, frames, youtube8m_dir, save)
-        self.extrat_resnet50_feat(video_file, frames, resnet50_dir, save)
-        self.extract_vggish_feat(video_file, split_audio_files, vggish_dir, save)
-        self.extract_stft_feat(video_file, split_audio_files, stft_dir, save)
-        self.extract_ocr_feat(video_file, frames, ocr_dir, save)
-        self.extract_asr_feat(video_file, frames, asr_dir, save)
-
-    #根据frames分割video成mp4和wav
-    def split_video(self, video_file, frames, split_dir, frame_count, fps):
-        split_video_files = []
-        split_audio_files = []
-        for i, (start_index, end_index) in enumerate(self.gen_ts_interval(frame_count, frames)):
-            split_video_file, split_audio_file = utils.split_video(i, start_index, end_index, fps, video_file, split_dir, log = self.error_log)
-            split_video_files.append(split_video_file)
-            split_audio_files.append(split_audio_file)
-        return split_video_files, split_audio_files
+        if flag:
+            self.extract_youtube8m_feat(video_file, frames, youtube8m_dir, save)
+            self.extrat_resnet50_feat(video_file, frames, resnet50_dir, save)
+            self.extract_vggish_feat(video_file, split_audio_files, vggish_dir, save)
+            self.extract_stft_feat(video_file, split_audio_files, stft_dir, save)
+            self.extract_ocr_feat(video_file, frames, ocr_dir, save)
+            self.extract_asr_feat(video_file, frames, asr_dir, save)
 
     def gen_img_batch(self, cap, video_file, feat_dir, fps, frames, batch_size):
         video_id = video_file.split('/')[-1].split('.')[0]
@@ -252,17 +241,4 @@ class MultiModalFeatureExtract(object):
         if cnt > 0:
             yield r_start_frame, r_end_frame, r_index, r_frame, cnt % batch_size
 
-    def gen_ts_interval(self, frame_count, frames):
-        count = 0
-        if frame_count <= 0:
-            return
-        pre_index = 0
-        cur_index = 0
-        while True:
-            cur_index += 1
-            if cur_index >= frame_count:
-                break
-            if cur_index in frames:
-                yield pre_index, cur_index
-                count += 1
-                pre_index = cur_index
+    
