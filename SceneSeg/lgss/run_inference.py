@@ -1,145 +1,55 @@
 from __future__ import print_function
 
 from mmcv import Config
-from tensorboardX import SummaryWriter
-
 import lgss.models as models
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from lgss.data.get_data import get_data
+from lgss.data.get_data import get_inference_data
 from torch.utils.data import DataLoader
-from lgss.utilis import (cal_MIOU, cal_Recall, cal_Recall_time, get_ap, get_mAP_seq,
-                    load_checkpoint, mkdir_ifmiss, pred2scene, save_checkpoint,
-                    save_pred_seq, scene2video, to_numpy, write_json)
+import lgss.utilis
+from lgss.utilis import (load_checkpoint, pred2scene, save_pred_seq, scene2video)
 from utilis.package import *
 import glob
 from concurrent.futures import ThreadPoolExecutor
 import json
-
+import lgss.models.lgss_util as lgss_util
 
 final_dict = {}
-test_iter, val_iter = 0, 0
-
-def test(cfg, model, test_loader, criterion, args, mode='test'):
-    global test_iter, val_iter
-    model.eval()
-    test_loss = 0
-    correct1, correct0 = 0, 0
-    gt1, gt0, all_gt = 0, 0, 0
-    prob_raw, gts_raw = [], []
-    preds, gts = [], []
-    batch_num = 1	#0
-    with torch.no_grad():
-        for data_place, data_cast, data_act, data_aud, target in test_loader:
-            batch_num += 1
-            if args.use_gpu == 1:
-                data_place = data_place.cuda() if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
-                data_place = data_place.cuda() if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
-                data_cast  = data_cast.cuda()  if 'cast'  in cfg.dataset.mode else []
-                data_act   = data_act.cuda()   if 'act'   in cfg.dataset.mode else []
-                data_aud   = data_aud.cuda()   if 'aud'   in cfg.dataset.mode else []
-                target = target.view(-1).cuda()
-            else:
-                data_place = data_place if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
-                data_place = data_place if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
-                data_cast  = data_cast  if 'cast'  in cfg.dataset.mode else []
-                data_act   = data_act   if 'act'   in cfg.dataset.mode else []
-                data_aud   = data_aud   if 'aud'   in cfg.dataset.mode else []
-                target = target.view(-1)
-
-            output = model(data_place, data_cast, data_act, data_aud)
-            output = output.view(-1, 2)
-            loss = criterion(output, target)
-
-            if mode == 'test':
-                test_iter += 1
-                if loss.item() > 0:
-                    writer.add_scalar('test/loss', loss.item(), test_iter)
-            elif mode == 'val':
-                val_iter += 1
-                if loss.item() > 0:
-                    writer.add_scalar('val/loss', loss.item(), val_iter)
-
-            test_loss += loss.item()
-            output = F.softmax(output, dim=1)
-            prob = output[:, 1]
-            gts_raw.append(to_numpy(target))
-            prob_raw.append(to_numpy(prob))
-
-            gt = target.cpu().detach().numpy()
-            prediction = np.nan_to_num(prob.squeeze().cpu().detach().numpy()) > 0.5
-            idx1 = np.where(gt == 1)[0]
-            idx0 = np.where(gt == 0)[0]
-            gt1 += len(idx1)
-            gt0 += len(idx0)
-            all_gt += len(gt)
-            correct1 += len(np.where(gt[idx1] == prediction[idx1])[0])
-            correct0 += len(np.where(gt[idx0] == prediction[idx0])[0])
-        for x in gts_raw:
-            gts.extend(x.tolist())
-        for x in prob_raw:
-            preds.extend(x.tolist())
-
-    test_loss /= batch_num
-    ap = get_ap(gts_raw, prob_raw)
-    mAP, mAP_list = get_mAP_seq(test_loader, gts_raw, prob_raw)
-    print("AP: {:.3f}".format(ap))
-    print('mAP: {:.3f}'.format(mAP))
-    print('Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-        test_loss, correct1 + correct0, all_gt,
-        100. * (correct0 + correct1)/all_gt))
-    print('Accuracy1: {}/{} ({:.0f}%), Accuracy0: {}/{} ({:.0f}%)'.format(
-        correct1, gt1, 100.*correct1/(gt1+1e-5), correct0, gt0,
-        100.*correct0/(gt0+1e-5)))
-    if mode == "val" or mode == "test":
-        return mAP.mean()
-    elif mode == "test_final":
-        final_dict.update({
-            "AP":  ap,
-            "mAP": mAP,
-            "Accuracy":  100 * (correct0 + correct1)/all_gt,
-            "Accuracy1": 100 * correct1/(gt1+1e-5),
-            "Accuracy0": 100 * correct0/(gt0+1e-5),
-            })
-        return gts, preds
 
 def load_model(cfg, args):
     model = models.__dict__[cfg.model.name](cfg).cuda()
     model = nn.DataParallel(model)
     checkpoint = load_checkpoint(cfg.model_path, args.use_gpu)
     model.load_state_dict(checkpoint['state_dict'])
-    return model 
-    
-def main(cfg, model, args, video_name):
-    logs_dir = os.path.join(args.data_root, "test_results", video_name)
-    if osp.exists(logs_dir + '/pred_scene.json'):
-        print(logs_dir + '/pred_scene.json exist.')
-        with open(logs_dir + '/pred_scene.json', 'r') as f:
-            scene_obj = json.load(f)
-            scene_list = []
-            for scene_ind, v in sorted(scene_obj.items(), key=lambda x: x[0]):
-                scene_list.append(v['frame'])
-                if len(scene_list) == 0:
-                    print(logs_dir)
-                scene2video(cfg, scene_list, args, video_name)
-        return
-    print(logs_dir + '/pred_scene.json not exist.')
-    all_set = get_data(cfg, video_name)
-    data_loader = DataLoader(all_set, batch_size=cfg.batch_size, shuffle=False, **cfg.data_loader_kwargs, num_workers=3)
-    criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
-    gts, preds = test(cfg, model, data_loader, criterion, args, mode='test_final')
-    save_pred_seq(cfg, test_loader, gts, preds, logs_dir)
-    print('...visualize scene video in demo mode', 'the above quantitive metrics are invalid')
-    scene_dict, scene_list = pred2scene(cfg, 0.65, video_name, logs_dir)
+    return model
+
+def main(cfg, args, video_name, value):
+    end_frames = sorted([int(key) for key in value.keys()])
+    last_frame = 0
+    scene_list = [[last_frame, last_frame]]
+    cur = 0
+    for end_frame in end_frames:
+        v = value[str(end_frame)]
+        label = 0
+        if v['prob'] >= args.threshold:
+            label = 1
+        if label == 0:
+            scene_list[cur][1] = end_frame
+        else:
+            if last_frame == end_frame:
+                scene_list[cur][1] = end_frame
+            else:
+                scene_list.append([last_frame, end_frame])
+                cur += 1
+        last_frame = end_frame + 1
     scene2video(cfg, scene_list, args, video_name)
-        
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
     parser.add_argument('--config', help='config file path', default = '/home/tione/notebook/VideoStructuring/SceneSeg/config/inference_hsv.py')
     parser.add_argument('--max_workers', type=int, default = 20)
     parser.add_argument('--use_gpu', type=int, default = 1)
+    parser.add_argument('--threshold', type=float, default=0.65)
     args = parser.parse_args()
     return args
 
@@ -153,10 +63,40 @@ if __name__ == '__main__':
     print('model complete')
     print(args.video_dir)
 
+    video_names = []
+    video_inference_res = {}
+    for video_path in glob.glob(os.path.join(cfg.video_dir, '*.mp4')):
+        video_name = os.path.basename(video_path).split(".m")[0]
+        log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
+        if osp.exists(log_path):
+            print(log_path + ' exist.')
+            with open(log_path, 'r') as f:
+                video_inference_res[video_name] = json.load(f)
+            continue
+        print(log_path + ' does not exist.')
+        video_names.append(video_name)
+    data = get_inference_data(cfg, video_names)
+    data_loader = DataLoader(data, batch_size=cfg.batch_size, shuffle=False, **cfg.data_loader_kwargs)
+
+    criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
+    inference_res, total_loss = lgss_util.inference(cfg, args, model, data_loader, criterion)
+    for x in inference_res:
+        label = x[0]
+        prob = x[1]
+        end_frame = x[2]
+        video_name = x[3]
+        if video_name not in video_inference_res:
+            video_inference_res[video_name] = {}
+        video_inference_res[video_name][str(end_frame)] = {'prob': prob, 'label': label}
+    for video_name, value in video_inference_res.items():
+        log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
+        with open(log_path, 'w') as f:
+            json.dump(value, f, ensure_ascii=False, indent=4)
+
     results = []
     with ThreadPoolExecutor(max_workers = args.max_workers) as executor:
-        for video_path in glob.glob(os.path.join(args.video_dir,'*.mp4')):
-            video_name = os.path.basename(video_path).split(".m")[0]
-            results.append(executor.submit(main, cfg, model, args, video_name))
-        results = [res.result() for res in results]
+        for video_name, value in video_inference_res.items():
+            results.append(executor.submit(main, cfg, args, video_name, value))
+        for res in results:
+            res.result()
     print('done')

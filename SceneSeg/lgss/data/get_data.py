@@ -5,6 +5,7 @@ import torch.utils.data as data
 from torchvision import datasets, transforms
 from utilis import read_json, read_pkl, read_txt_list, strcal
 from utilis.package import *
+import cv2
 
 normalizer = transforms.Normalize(
     mean=[0.485, 0.456, 0.406],
@@ -32,6 +33,24 @@ class Preprocessor(data.Dataset):
         self.transform = transformer
         assert (len(self.mode) > 0)
         self.data_dict = data_dict
+        self.fps_dict = {}
+        self.shot_frames = {}
+        video_ids = set([])
+        for x in self.listIDs:
+            for xx in x:
+                video_ids.add(xx['imdbid'])
+        shot_txt_dir = os.path.join(cfg.data_root, 'shot_txt')
+        for video_id in video_ids:
+            txt_path = os.path.join(shot_txt_dir, '{}.txt'.format(video_id))
+            video_path = os.path.join(cfg.video_dir, '{}.mp4'.format(video_id))
+            if os.path.exists(txt_path):
+                with open(txt_path, 'r') as f:
+                    for index, line in enumerate(f):
+                        cols = line.strip('\n').split(' ')
+                        self.shot_frames[self.gen_key(video_id, strcal(index, 0))] = [int(x) for x in cols]
+
+    def gen_key(self, video_id, shot_id):
+        return video_id + '_' + shot_id
 
     def __len__(self):
         return len(self.listIDs)
@@ -39,14 +58,16 @@ class Preprocessor(data.Dataset):
     def __getitem__(self, index):
         ID_list = self.listIDs[index]
         if isinstance(ID_list, (tuple, list)):
-            place_feats, cast_feats, act_feats, aud_feats, labels = [], [], [], [], []
+            place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids = [], [], [], [], [], [], []
             for ID in ID_list:
-                place_feat, cast_feat, act_feat, aud_feat, label = self._get_single_item(ID)
+                place_feat, cast_feat, act_feat, aud_feat, label, end_frame, video_id = self._get_single_item(ID)
                 place_feats.append(place_feat)
                 cast_feats.append(cast_feat)
                 act_feats.append(act_feat)
                 aud_feats.append(aud_feat)
                 labels.append(label)
+                end_frames.append(end_frame)
+                video_ids.append(video_id)
             if 'place' in self.mode:
                 place_feats = torch.stack(place_feats)
             if 'cast' in self.mode:
@@ -56,7 +77,9 @@ class Preprocessor(data.Dataset):
             if 'aud' in self.mode:
                 aud_feats = torch.stack(aud_feats)
             labels = np.array(labels)
-            return place_feats, cast_feats, act_feats, aud_feats, labels
+            end_frames = np.array(end_frames)
+            video_ids = np.array(video_ids)
+            return place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids
         else:
             return self._get_single_item(ID_list)
         '''
@@ -77,7 +100,10 @@ class Preprocessor(data.Dataset):
     def _get_single_item(self, ID):
         imdbid = ID['imdbid']
         shotid = ID['shotid']
-        label = 1  # self.data_dict["annos_dict"].get(imdbid).get(shotid)
+        end_frame = self.shot_frames[self.gen_key(imdbid, shotid)][1]
+        label = 0
+        if 'annos_dict' in self.data_dict:
+            label = self.data_dict["annos_dict"].get(imdbid).get(shotid, 0)
         aud_feats, place_feats = [], []
         cast_feats, act_feats = [], []
         if 'place' in self.mode:
@@ -121,7 +147,7 @@ class Preprocessor(data.Dataset):
             act_feats = torch.stack(act_feats)
         if len(aud_feats) > 0:
             aud_feats = torch.stack(aud_feats)
-        return place_feats, cast_feats, act_feats, aud_feats, label
+        return place_feats, cast_feats, act_feats, aud_feats, label, end_frame, imdbid
 
         '''
         shotid = ID["shotid"]
@@ -147,7 +173,7 @@ class Preprocessor(data.Dataset):
         return imgs, label
         '''
 
-def get_train_data(cfg, video_name):
+def get_train_data(cfg):
     imdbidlist_json, annos_dict, annos_valid_dict, casts_dict, acts_dict = train_data_utils.data_pre(cfg)
     partition = train_data_utils.data_partition(cfg, imdbidlist_json, annos_valid_dict)
     data_dict = {"annos_dict": annos_dict, "casts_dict": casts_dict, "acts_dict": acts_dict}
@@ -155,8 +181,7 @@ def get_train_data(cfg, video_name):
     val_set = Preprocessor(cfg, partition['val'], data_dict)
     return train_set, val_set
 
-def get_inference_data(cfg, video_name):
-    valid_shotids = inference_data_util.get_shot_ids(cfg, video_name)
-    partition = inference_data_util.data_partition(cfg, valid_shotids, video_name)
-    all_set = Preprocessor(cfg, partition['all'], {})
+def get_inference_data(cfg, video_names):
+    data = inference_data_util.get_data(cfg, video_names)
+    all_set = Preprocessor(cfg, data, {})
     return all_set

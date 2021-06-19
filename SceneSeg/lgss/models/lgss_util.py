@@ -6,39 +6,41 @@ import sklearn.metrics
 from concurrent.futures import ThreadPoolExecutor
 import json
 import math
+import torch.nn.functional as F
 
-def _inference(args, model, data_youtube8m, data_stft, video_id, index, ts, label, criterion, ori_label):
-    if args.use_gpu == 1:
-        try:
-            data_youtube8m = data_youtube8m.cuda()
-            data_stft = data_stft.cuda()
-            ori_label = ori_label.cuda()
-        except Exception as e:
-            print(e)
-            return []
-    output = model(data_youtube8m, data_stft)
+def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids):
+    total_loss = 0
+    data_place = data_place.cuda() if 'place' in cfg.dataset.mode else []
+    data_cast  = data_cast.cuda()  if 'cast'  in cfg.dataset.mode else []
+    data_act   = data_act.cuda()   if 'act'   in cfg.dataset.mode else []
+    data_aud   = data_aud.cuda()   if 'aud'   in cfg.dataset.mode else []
+    target = target.view(-1).cuda()
+
+    output = model(data_place, data_cast, data_act, data_aud)
     output = output.view(-1, 2)
-    loss = criterion(output, ori_label)
-    output = functional.softmax(output, dim=1)
-    probs = output[:, 1].cpu().detach().numpy()
-    probs = probs.tolist()
-    res = []
-    for i in range(len(label)):
-        res.append([video_id[i], index[i], ts[i], probs[i], label[i]])
-    return res, loss
+    loss = criterion(output, target)
 
-def inference(args, model, data_loader, criterion):
+    total_loss += loss.item()
+    output = F.softmax(output, dim=1)
+    prob = output[:, 1]
+    labels = to_numpy(target).tolist()
+    probs = to_numpy(prob)
+    end_frames = to_numpy(end_frames.view(-1)).tolist()
+    video_ids = to_numpy(video_ids.view(-1)).tolist()
+    other = []
+    for i in range(len(labels)):
+        other.append((labels[i], probs[i], end_frames[i], video_ids[i]))
+    return other, total_loss
+
+def inference(cfg, args, model, data_loader, criterion):
     model.eval()
     res = []
     total_loss = 0.0
     with torch.no_grad():
-        with ThreadPoolExecutor(max_workers=args.max_worker) as executor:
-            for ps in gen_batch(data_loader, executor, args, model, criterion):
-                for p in ps:
-                    t, loss = p.result()
-                    res.extend(t)
-                    total_loss += loss
-                    break
+        for data_place, data_cast, data_act, data_aud, target, end_frames, video_ids in tqdm.tqdm(data_loader, total=len(data_loader)):
+            t, loss = _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids)
+            res.extend(t)
+            total_loss += loss
     return res, total_loss
 
 def val(res, threshold, total_loss, args):
@@ -109,17 +111,3 @@ def val(res, threshold, total_loss, args):
         f1_w = 2 * t1 * t2 / (t1 + t2)
     print(tp, pt, rt)
     return auc, acc, recall, precision, ap, f1, avg_loss, f1_w
-
-def gen_batch(data_loader, executor, args, model, criterion):
-    cnt = 0
-    ps = []
-    for data_youtube8m, data_stft, label, video_id, index, ts in tqdm.tqdm(data_loader, total = len(data_loader)):
-        cnt += 1
-        ps.append(executor.submit(_inference, args, model,
-            data_youtube8m, data_stft,
-            video_id, index.numpy().tolist(), ts.numpy().tolist(), label.numpy().tolist(), criterion, label))
-        if cnt % args.max_worker == 0:
-            yield ps
-            ps = []
-    if cnt > 0:
-        yield ps

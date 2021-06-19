@@ -1,9 +1,7 @@
 from __future__ import print_function
-
-import sys
 from multiprocessing import Manager, Process
-from utilis import read_json, read_txt_list, strcal
-from utilis.package import *
+from lgss.utilis import read_json, read_txt_list, strcal
+from lgss.utilis.package import *
 
 def data_partition(cfg, imdbidlist_json, annos_dict):
     assert (cfg.seq_len % 2 == 0)

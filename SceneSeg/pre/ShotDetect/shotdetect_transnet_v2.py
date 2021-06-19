@@ -136,7 +136,6 @@ def main(device, model, args, video_path, data_root):
         # Obtain list of detected shots.
         shot_list = get_shots_from_cuts(cut_list, base_timecode, frame_count)
 
-
         # Set downscale factor to improve processing speed.
         if args.keep_resolution:
             video_manager.set_downscale_factor(1)
