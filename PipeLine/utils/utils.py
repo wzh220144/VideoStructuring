@@ -3,6 +3,21 @@ import sys
 import cv2
 import subprocess
 
+def gen_ts_interval(frame_count, frames):
+    count = 0
+    if frame_count <= 0:
+        return
+    pre_index = 0
+    cur_index = 0
+    while True:
+        cur_index += 1
+        if cur_index >= frame_count:
+            break
+        if cur_index in frames:
+            yield pre_index, cur_index
+            count += 1
+            pre_index = cur_index
+
 def get_frames_same_interval(frame_count, interval):
     frames = set([])
     cur_frame = 0
