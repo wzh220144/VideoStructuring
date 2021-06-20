@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 from lgss.data.get_data import get_inference_data
 from torch.utils.data import DataLoader
-import lgss.utilis
-from lgss.utilis import (load_checkpoint, scene2video)
+import lgss.utils
+from lgss.utils import (load_checkpoint, scene2video)
 from utilis.package import *
 import glob
 from concurrent.futures import ThreadPoolExecutor

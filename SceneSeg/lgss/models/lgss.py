@@ -187,12 +187,15 @@ class LGSS(nn.Module):
 
 if __name__ == '__main__':
     from mmcv import Config
-    cfg = Config.fromfile("/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/train_hsv.py")
+    cfg = Config.fromfile("../config/train_hsv.py")
     model = LGSS(cfg)
     place_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 2048)
     cast_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 512)
     act_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 512)
     aud_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 257, 90)
+    target = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 1)
+    print(target.shape, target.view(-1).shape)
     output = model(place_feat, cast_feat, act_feat, aud_feat)
+    print(output.shape)
     print(cfg.batch_size)
     print(output.data.size())
