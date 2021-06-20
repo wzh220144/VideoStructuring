@@ -1,4 +1,4 @@
-from . import read_txt_list, mkdir_ifmiss, write_json
+from . import mkdir_ifmiss
 from .package import *
 import cv2
 import numpy as np
@@ -6,60 +6,6 @@ from sklearn.metrics import average_precision_score
 import torch
 import subprocess
 import collections
-
-def get_pair_list(anno_dict):
-    sort_anno_dict_key = sorted(anno_dict.keys())
-    tmp = 0
-    tmp_list = []
-    tmp_label_list = []
-    anno_list = []
-    anno_label_list = []
-    for key in sort_anno_dict_key:
-        # print(key, value)
-        value = anno_dict.get(key)
-        # print(key, value)
-        tmp += value
-        tmp_list.append(key)
-        tmp_label_list.append(value)
-        if tmp == 1:
-            anno_list.append(tmp_list)
-            anno_label_list.append(tmp_label_list)
-            tmp = 0
-            tmp_list = []
-            tmp_label_list = []
-            continue
-        # print(anno_list)
-    if len(anno_list) == 0 and len(anno_dict) == 0:
-        return None
-    if len(anno_list) == 0:
-        return [[key for key in sort_anno_dict_key]]
-    if len(anno_dict) - 1 > int(anno_list[-1][-1]):
-        anno_list.append([key for key in sort_anno_dict_key[int(anno_list[-1][-1]) + 1:]])
-        # print(anno_list)
-    while [] in anno_list:
-        anno_list.remove([])
-    tmp_anno_list = [anno_list[0]]
-    pair_list = []
-    for ind in range(len(anno_list) - 1):
-        cont_count = int(anno_list[ind + 1][0]) - int(anno_list[ind][-1])
-        if cont_count > 1:
-            pair_list.extend(tmp_anno_list)
-            tmp_anno_list = [anno_list[ind + 1]]
-            continue
-        tmp_anno_list.append(anno_list[ind + 1])
-    pair_list.extend(tmp_anno_list)
-    return pair_list
-
-def get_demo_scene_list(cfg, anno_dict, video_name):
-    pair_list = get_pair_list(anno_dict)
-    scene_list = []
-    for pair in pair_list:
-        start_shot, end_shot = int(pair[0]), int(pair[-1])
-        start_frame = shotfrmlist[start_shot].split(" ")[0]
-        end_frame = shotfrmlist[end_shot].split(" ")[1]
-        scene_list.append((start_frame, end_frame))
-
-    return scene_list, pair_list
 
 def getIntersection(interval_1, interval_2):
     assert interval_1[0] < interval_1[1], "start frame is bigger than end frame."
@@ -149,43 +95,6 @@ def get_mAP_seq(loader, gts_raw, preds_raw):
         mAP.append(round(np.nan_to_num(ap), 2))
         # print(mAP)
     return np.mean(mAP), np.array(mAP)
-
-def save_pred_seq(cfg, loader, gts, preds, logs_dir):
-    mkdir_ifmiss(osp.join(logs_dir, 'pred'))
-    for threshold in np.arange(0, 1.01, 0.05):
-        pred_fn = osp.join(logs_dir, 'pred/pred_{:.2f}.txt'.format(threshold))
-        n = min(len(loader.dataset.listIDs), len(gts) // cfg.seq_len, len(preds) // cfg.seq_len)
-        tmp = np.array(preds, np.float32)
-        tmp = (tmp > threshold).astype(np.int32)
-        with open(pred_fn, "w") as f:
-            for i in range(n):
-                for j in range(cfg.seq_len):
-                    one_idx = loader.dataset.listIDs[i][j]
-                    f.write('{} {} {} {}\n'.format(one_idx['imdbid'], one_idx['shotid'], \
-                                                   gts[i * cfg.seq_len + j], tmp[i * cfg.seq_len + j]))
-
-def pred2scene(cfg, threshold, video_name, logs_dir):
-    pred_fn = osp.join(logs_dir, 'pred/pred_{:.2f}.txt'.format(threshold))
-    # print("pred_fn", pred_fn)
-    pred_list = read_txt_list(pred_fn)
-    # print("pred_list", pred_list)
-    scene_list, pair_list = get_demo_scene_list(cfg, pred_list, video_name)
-    # print("scene_list", scene_list)
-    # print("pair_list", pair_list)
-    scene_dict = {}
-    assert len(scene_list) == len(pair_list)
-    print("...pred list to scene list process")
-    for scene_ind, scene_item in enumerate(scene_list):
-        scene_dict.update({
-            scene_ind: {
-                "shot": pair_list[scene_ind],
-                "frame": scene_item
-            }
-        })
-    write_json(osp.join(logs_dir, "pred_scene.json"), scene_dict)
-    print(
-        '...scene dict with the information of each scene is saved in {}'.format(osp.join(logs_dir, "pred_scene.json")))
-    return scene_dict, scene_list
 
 def scene2video(cfg, scene_list, video_name):
     source_movie_fn = '{}.mp4'.format(osp.join(cfg.video_dir, video_name))

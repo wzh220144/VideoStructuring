@@ -13,9 +13,9 @@ import sklearn.metrics
 def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids):
     total_loss = 0
     data_place = data_place.cuda() if 'place' in cfg.dataset.mode else []
-    data_cast  = data_cast.cuda()  if 'cast'  in cfg.dataset.mode else []
-    data_act   = data_act.cuda()   if 'act'   in cfg.dataset.mode else []
-    data_aud   = data_aud.cuda()   if 'aud'   in cfg.dataset.mode else []
+    data_cast = data_cast.cuda() if 'cast' in cfg.dataset.mode else []
+    data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
+    data_aud = data_aud.cuda() if 'aud' in cfg.dataset.mode else []
     target = target.view(-1).cuda()
 
     output = model(data_place, data_cast, data_act, data_aud)
@@ -39,13 +39,16 @@ def inference(cfg, args, model, data_loader, criterion):
     res = []
     total_loss = 0.0
     with torch.no_grad():
-        for data_place, data_cast, data_act, data_aud, target, end_frames, video_ids in tqdm.tqdm(data_loader, total=len(data_loader)):
-            t, loss = _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids)
+        for data_place, data_cast, data_act, data_aud, target, end_frames, video_ids in tqdm.tqdm(data_loader,
+                                                                                                  total=len(
+                                                                                                          data_loader)):
+            t, loss = _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target,
+                                 end_frames, video_ids)
             res.extend(t)
             total_loss += loss
     return res, total_loss
 
-def val(res, threshold, total_loss, args, fps_dict):
+def val(cfg, res, threshold, total_loss, args, fps_dict):
     probs = [x[1] for x in res]
     predicts = [1 if x[1] >= threshold else 0 for x in res]
     labels = [x[0] for x in res]
