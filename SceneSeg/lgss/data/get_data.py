@@ -3,8 +3,8 @@ import lgss.data.inference_data_utils as inference_data_util
 import torch
 import torch.utils.data as data
 from torchvision import datasets, transforms
-from utilis import read_json, read_pkl, read_txt_list, strcal
-from utilis.package import *
+from lgss.utils import read_json, read_pkl, read_txt_list, strcal
+from lgss.utils.package import *
 import cv2
 
 normalizer = transforms.Normalize(

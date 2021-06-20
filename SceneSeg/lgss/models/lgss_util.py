@@ -1,4 +1,4 @@
-from utils.torch_utils import *
+from lgss.utils.torch_utils import *
 import torch.nn.functional as functional
 import tqdm
 import sklearn

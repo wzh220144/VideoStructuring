@@ -1,4 +1,4 @@
-from . import mkdir_ifmiss,strcal,get_pair_list,getRatio
+from . import mkdir_ifmiss,strcal,getRatio
 from .package import *
 
 def get_result_dict(metric_dict):

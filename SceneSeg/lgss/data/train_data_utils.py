@@ -1,7 +1,7 @@
 from __future__ import print_function
 from multiprocessing import Manager, Process
-from lgss.utilis import read_json, read_txt_list, strcal
-from lgss.utilis.package import *
+from lgss.utils import read_json, read_txt_list, strcal
+from lgss.utils.package import *
 
 def data_partition(cfg, imdbidlist_json, annos_dict):
     assert (cfg.seq_len % 2 == 0)
@@ -87,6 +87,7 @@ def data_pre_one(cfg, imdbid, acts_dict, casts_dict, annos_dict, annos_valid_dic
 def data_pre(cfg):
     data_root = cfg.data_root
     imdbidlist_json = osp.join(data_root, 'meta/split.json')
+
     imdbidlist_json = read_json(imdbidlist_json)
     # print(imdbidlist_json)
     imdbidlist = imdbidlist_json['all']

@@ -1,5 +1,5 @@
-from utilis import mkdir_ifmiss,strcal
-from utilis.package import *
+from lgss.utils import mkdir_ifmiss,strcal
+from lgss.utils.package import *
 from sklearn.metrics import recall_score
 
 def get_result_dict(metric_dict):

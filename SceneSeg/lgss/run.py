@@ -10,15 +10,15 @@ import torch.nn.functional as F
 import torch.optim as optim
 from lgss.data.get_data import get_train_data
 from torch.utils.data import DataLoader
-from lgss.utilis import (cal_MIOU, cal_Recall, cal_Recall_time, get_ap, get_mAP_seq, load_checkpoint, mkdir_ifmiss, save_checkpoint)
-from utilis.package import *
+from lgss.utils import (cal_MIOU, cal_Recall, cal_Recall_time, get_ap, get_mAP_seq, load_checkpoint, mkdir_ifmiss, save_checkpoint)
+from lgss.utils.package import *
 import sklearn
 import lgss.models.lgss_util as lgss_util
 import sklearn.metrics
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
-    parser.add_argument('--config', type=str, default='/home/tione/notebook/VideoStructuring/SceneSeg/config/train_hsv.py')
+    parser.add_argument('--config', type=str, default='/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/train_hsv.py')
     parser.add_argument('--annotation_file', type=str, default='/home/tione/notebook/dataset/structuring/GroundTruth/train5k.txt')
     args = parser.parse_args()
     return args

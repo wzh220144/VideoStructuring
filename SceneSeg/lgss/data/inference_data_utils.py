@@ -1,6 +1,6 @@
 from __future__ import print_function
-from lgss.utilis import strcal
-from lgss.utilis.package import *
+from lgss.utils import strcal
+from lgss.utils.package import *
 
 def get_data(cfg, video_names):
     assert (cfg.seq_len % 2 == 0)
