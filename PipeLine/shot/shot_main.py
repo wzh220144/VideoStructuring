@@ -62,9 +62,6 @@ if __name__ == '__main__':
     elif args.mode == 3:
         shot_dir = args.shot_dir + '/hsv'
 
-    print(args.split_dir)
-
-    os.makedirs(split_dir, exist_ok=True)
     os.makedirs(shot_dir, exist_ok=True)
 
     gens = []

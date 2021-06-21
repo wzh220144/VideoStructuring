@@ -128,7 +128,7 @@ def read_shot_info(video_file, shot_dir):
     if os.path.exists(info_file):
         with open(info_file, 'r') as f:
             flag = True
-            frames = set(f.readline().strip('\n').split(' '))
+            frames = set([int(x) for x in f.readline().strip('\n').split(' ')])
             split_video_files = f.readline().strip('\n').split('\t')
             split_audio_files = f.readline().strip('\n').split('\t')
     return frames, split_video_files, split_audio_files, flag
