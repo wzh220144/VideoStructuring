@@ -31,7 +31,7 @@ class MultiModalFeatureExtract(object):
                  device = 'cuda',
                  ):
         super(MultiModalFeatureExtract, self).__init__()
-        self.error_log = open('/home/tione/notebook/VideoStructuring/PipeLine/err.log', 'w')
+        self.error_log = open('/home/tione/notebook/VideoStructuring/PipeLine/feat_err.log', 'w')
         self.extract_youtube8m = extract_youtube8m
         self.extract_resnet50 = extract_resnet50
         self.extract_vggish = extract_vggish
@@ -74,8 +74,7 @@ class MultiModalFeatureExtract(object):
             cap = cv2.VideoCapture(video_file)
             fps = cap.get(cv2.CAP_PROP_FPS)
             video_id = video_file.split('/')[-1].split('.')[0]
-            feat_dir = '{}/{}'.format(youtube8m_dir, video_id)
-            os.makedirs(feat_dir, exist_ok=True)
+            os.makedirs(youtube8m_dir, exist_ok=True)
             for r_start_frame, r_end_frame, r_index, r_frame, cnt in self.gen_img_batch(cap, video_file, youtube8m_dir, fps, frames, self.batch_size):
                 feats = self.youtube8m_extractor.extract_rgb_frame_features_list(r_frame, cnt)
                 if save:
@@ -83,7 +82,7 @@ class MultiModalFeatureExtract(object):
                         start_frame = r_start_frame[i]
                         end_frame = r_end_frame[i]
                         index = r_index[i]
-                        feat_file = '{}/{}/{}#{}#{}#{}.npy'.format(youtube8m_dir, video_id, index, start_frame, end_frame, fps)
+                        feat_file = '{}/{}#{}#{}#{}.npy'.format(youtube8m_dir, index, start_frame, end_frame, int(fps))
                         np.save(feat_file, feats[i])
             end_time = time.time()
             cap.release()
@@ -159,13 +158,13 @@ class MultiModalFeatureExtract(object):
             for audio_file in split_audio_files:
                 index = audio_file.split('/')[-1].split('.')[0]
                 vid = audio_file.split('/')[-2]
-                feat_dir = '{}/{}'.format(stft_dir, vid)
-                os.makedirs(feat_dir, exist_ok=True)
-                feat_path = '{}/{}/{}.npy'.format(stft_dir, vid, index)
+                os.makedirs(stft_dir, exist_ok=True)
+                feat_path = '{}/{}.npy'.format(stft_dir, index)
                 if os.path.exists(feat_path):
                     self.error_log.write('{} exist.\n'.format(feat_path))
                     continue
                 try:
+                    self.error_log.write('{} do not exist.\n'.format(feat_path))
                     t = self.stft_extractor.extract_stft(audio_file)
                     if save:
                         np.save(feat_path, t)
@@ -192,6 +191,7 @@ class MultiModalFeatureExtract(object):
         frames, split_video_files, split_audio_files, flag = utils.read_shot_info(video_file, shot_dir)
 
         if flag:
+            self.error_log.write('start extract feat of {}\n'.format(video_file))
             self.extract_youtube8m_feat(video_file, frames, youtube8m_dir, save)
             self.extrat_resnet50_feat(video_file, frames, resnet50_dir, save)
             self.extract_vggish_feat(video_file, split_audio_files, vggish_dir, save)
@@ -212,17 +212,22 @@ class MultiModalFeatureExtract(object):
         start_frame = 0
         index = 0
         cnt = 0
+        frame_index_dict = {}
+        sorted_frames = sorted(list(frames))
+        for i in range(1, len(sorted_frames)):
+            frame_index_dict[sorted_frames[i]] = i - 1
         while True:
             has_frame, frame = cap.read()
             if not has_frame:
                 break
             index += 1
             if index in frames:
-                feat_file = '{}/{}/{}#{}#{}#{}.npy'.format(feat_dir, video_id, cnt, start_frame, index, fps)
+                t_index = rame_index_dict[index]
+                feat_file = '{}/{}#{}#{}#{}.npy'.format(feat_dir, t_index, start_frame, index, int(fps))
                 if not os.path.exists(feat_file):
                     r_start_frame.append(start_frame)
                     r_end_frame.append(index)
-                    r_index.append(cnt)
+                    r_index.append(t_index)
                     r_frame.append(cur_frames[len(cur_frames) // 2])
                     cnt += 1
                     self.error_log.write('{} do not exist.\n'.format(feat_file))
@@ -231,14 +236,15 @@ class MultiModalFeatureExtract(object):
                 cur_frames = [frame]
                 start_frame = index
             if cnt % batch_size == 0 and cnt > 0:
-                yield r_start_frame, r_end_frame, r_index, r_frame, batch_size
+                yield r_start_frame, r_end_frame, r_index, r_frame, cnt
                 r_start_frame = []
                 r_end_frame = []
                 r_index = []
                 r_frame = []
+                cnt = 0
             cur_frames.append(frame)
 
         if cnt > 0:
-            yield r_start_frame, r_end_frame, r_index, r_frame, cnt % batch_size
+            yield r_start_frame, r_end_frame, r_index, r_frame, cnt
 
     

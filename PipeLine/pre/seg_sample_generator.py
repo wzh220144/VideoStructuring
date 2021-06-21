@@ -12,62 +12,68 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import time
 
 def read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft):
-    begin = time.time()
     cap = cv2.VideoCapture(video_file)
     video_id = video_file.split('/')[-1].split('.')[0]
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     ori_fps = cap.get(cv2.CAP_PROP_FPS)
-    frames = utils.get_frames_same_interval(frame_count, fps)
+
+    frames, split_video_files, split_audio_files, flag = utils.read_shot_info(video_file, args.shot_dir)
+
     cur_frame = 0
     info = {'index': [], 'ts': []}
     if extract_youtube8m:
         info['youtube8m'] = []
     if extract_stft:
         info['stft'] = []
-    duration = 0.0
-    while True:
-        has_frame, frame = cap.read()
-        if not has_frame:
-            break
-        ts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-        duration = max(duration, ts)
-        if cur_frame in frames:
-            flag = True
-            youtube8m_feat_path = ''
-            stft_feat_path = ''
-            if extract_youtube8m:
-                youtube8m_feat_path = os.path.join(youtube8m_feats_dir, '{}#{}.npy'.format(video_id, cur_frame))
-                if not os.path.exists(youtube8m_feat_path):
-                    print('{} do not exist.'.format(youtube8m_feat_path))
-                    flag = False
-                youtube8m_feat_path = '#{}.npy'.format(cur_frame)
-            if extract_stft:
-                stft_feat_path = os.path.join(stft_feats_dir, '{}#{}#{}.npy'.format(video_id, cur_frame, cur_frame + fps))
-                if not os.path.exists(stft_feat_path):
-                    print('{} do not exist.'.format(stft_feat_path))
-                    flag = False
-                stft_feat_path = '#{}#{}.npy'.format(cur_frame, cur_frame + fps)
-            if not flag:
-                cur_frame += 1
-                continue
-            info['index'].append(cur_frame)
-            info['ts'].append(ts)
-            if extract_youtube8m:
-                info['youtube8m'].append(youtube8m_feat_path)
-            if extract_stft:
-                info['stft'].append(stft_feat_path)
+    
+    youtube8m_feat_dict = {}
+    stft_feat_dict = {}
+    for x in glob.glob(youtube8m_feats_dir + '/{}/*.npy'.format(video_id)):
+        cols = x.split('/')[-1].split('.')[0].split('#')
+        key = cols[1] + '#' + cols[2]
+        youtube8m_feat_dict[key] = x.split('/')[-1]
+    for x in glob.glob(stft_feats_dir + '/{}/*.npy'.format(video_id)):
+        cols = x.split('/')[-1].split('.')[0].split('#')
+        key = cols[1] + '#' + cols[2]
+        stft_feat_dict[key] = x.split('/')[-1]
+
+    sorted_frames = sorted(list(frames))
+
+    for i in range(len(frames)-1):
+        start_frame = sorted_frames[i]
+        end_frame = sorted_frames[i + 1]
+        key = '{}#{}'.format(start_frame, end_frame)
+        flag = True
+        youtube8m_feat_path = ''
+        stft_feat_path = ''
+        if extract_youtube8m:
+            if key in youtube8m_feat_dict:
+                youtube8m_feat_path = youtube8m_feat_dict[key]
+            else:
+                flag = False
+                print('{} does not exist for youtube8m.'.format(key))
+
+        if extract_stft:
+            if key in stft_feat_dict:
+                stft_feat_path = stft_feat_dict[key]
+            else:
+                flag = False
+                print('{} does not exist for stft.'.format(key))
+
+        info['index'].append(start_frame)
+        info['ts'].append(end_frame / ori_fps)
+        info['youtube8m'].append(youtube8m_feat_path)
+        info['stft'].append(stft_feat_path)
         cur_frame += 1
     info['org_fps'] = ori_fps
     info['w'] = w
     info['h'] = h
     info['fps'] = fps
     info['id'] = video_id
-    info['duration'] = duration
+    info['duration'] = frame_count / fps
     info['frames'] = frame_count
     cap.release()
-    end = time.time()
-    duration =  float(frame_count) / float(ori_fps)
     return info
 
 def trans2id(labels, label_id_dict):
@@ -151,7 +157,7 @@ def _gen_samples(args, video_file, fps, window_size, label_id_dict, youtube8m_fe
     else:
         info = read_video_info(video_file, fps, youtube8m_feats_dir, stft_feats_dir, extract_youtube8m, extract_stft)
         with open(video_info_file, 'w') as fs:
-            json.dump(info, fs, ensure_ascii=False)
+            json.dump(info, fs, ensure_ascii=False, indent=4)
     #print(info)
     video_name = video_file.split('/')[-1]
     video_annotation = {}
@@ -196,6 +202,7 @@ if __name__ == "__main__":
     parser.add_argument('--train_postfix', type = str, default = 'train_5k_A')
     parser.add_argument('--test_postfix', type = str, default = 'test_5k_A')
     parser.add_argument('--video_dir', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/videos")
+    parser.add_argument('--shot_dir', type = str, default = "/home/tione/notebook/dataset/shot/train_5k_A/same_interval")
     parser.add_argument('--data_root', type = str, default = "/home/tione/notebook/VideoStructuring/dataset")
     parser.add_argument('--train_txt', type = str, default = "/home/tione/notebook/VideoStructuring/dataset/structuring/GroundTruth/train5k.txt")
     parser.add_argument('--label_id', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/label_id.txt')
