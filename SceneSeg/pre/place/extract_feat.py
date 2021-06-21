@@ -32,7 +32,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
 
-resnet50_model_path = "../lgss/src/models/resnet50-19c8e357.pth"
+resnet50_model_path = "/home/tione/notebook/VideoStructuring/pretrained/lgss/src/models/resnet50-19c8e357.pth"
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -434,7 +434,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser("Place feature using ResNet50 with ImageNet pretrain")
     parser.add_argument('--use_gpu', type=int, default=0)
     parser.add_argument('--max_worker', type=int, default=80)
-    parser.add_argument('--data_root', type=str, default="../data/ad300")
+    parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/videos/train_5k_A/shot_hsv")
     parser.add_argument('--save-one-frame-feat', type=bool, default=True)
     parser.add_argument('-b', '--batch-size', type=int, default=512)
     parser.add_argument('-j', '--workers', type=int, default=2)

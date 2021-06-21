@@ -223,7 +223,7 @@ class MultiModalFeatureExtract(object):
             index += 1
             if index in frames:
                 t_index = rame_index_dict[index]
-                feat_file = '{}/{}#{}#{}#{}.npy'.format(feat_dir, t_index, start_frame, index, int(fps))
+                feat_file = '{}/{}#{}#{}.npy'.format(feat_dir, t_index, start_frame, index, int(fps))
                 if not os.path.exists(feat_file):
                     r_start_frame.append(start_frame)
                     r_end_frame.append(index)

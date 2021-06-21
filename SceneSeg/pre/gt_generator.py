@@ -65,17 +65,17 @@ def match_shot_scene_boundary(save_dir, shot_dict, scene_dict):
              
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--video_dir', type = str, default = "../data/train799/video")
-    parser.add_argument('--data_root', type = str, default = "../data/train799")
-    parser.add_argument('--input_annotation', type = str, default = "../../dataset/gt_json/train799.json")
+    parser.add_argument('--ratio', type = float, default = 0.9)
+    parser.add_argument('--video_dir', type = str, default = "/home/tione/notebook/dataset/videos/train_5k_A")
+    parser.add_argument('--data_root', type = str, default = "/home/tione/notebook/dataset/train_5k_A/shot_hsv")
+    parser.add_argument('--input_annotation', type = str, default = "/home/tione/notebook/dataset/GroundTruth/train5k.txt")
     args = parser.parse_args()
     print(args)
 
     shot_dict = {}
     for video_file in glob.glob(args.video_dir + "/*.mp4"):
         video_id = video_file.split('/')[-1].split(".mp4")[0]
-        video_stats_path = os.path.join(args.data_root, "shot_stats", video_id+".csv")
-        video_shot_txt = os.path.join(args.data_root, "shot_txt", video_id+".txt")
+        video_shot_txt = os.path.join(args.data_root, "shot_txt", video_id + ".txt")
         if not os.path.exists(os.path.join(args.data_root, "shot_split_video", video_id)):
             print("{} not exists".format(os.path.join(args.data_root, "shot_split_video", video_id)))
             continue
@@ -88,8 +88,7 @@ if __name__ == "__main__":
             print("file {} is empty".format(video_shot_txt))
             continue
         shot_dict[video_id] = shot_frame_list[:-1] 
-    
-      
+
     scene_dict = parse_annotation(args.input_annotation, args.video_dir)
     print('shot_dict num', len(shot_dict))
     print('scene_dict num', len(scene_dict))
@@ -98,16 +97,14 @@ if __name__ == "__main__":
     os.makedirs(save_label_dir, exist_ok = True)
     match_shot_scene_boundary(save_label_dir, shot_dict, scene_dict)
 
-    split_dict = {"train":[], "val":[], "test":[], "all":[]}
+    split_dict = {"train":[], "val":[], "all":[]}
     for gt_txt in os.listdir(os.path.join(args.data_root, "labels")):
         video_id = gt_txt.split(".txt")[0]
-        choice = random.randint(0,4)
-        if choice <= 2:
+        p = random.random()
+        if p <= args.ratio:
             split_dict["train"].append(video_id)
-        if choice == 3:
+        else:
             split_dict["val"].append(video_id)
-        if choice == 4:
-            split_dict["test"].append(video_id)
         split_dict["all"].append(video_id)
     print("...split json done...")
     

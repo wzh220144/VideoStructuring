@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 import glob
 def main(args, video_path, data_root):
+    print(data_root)
     video_path = osp.abspath(video_path)
     video_prefix = video_path.split("/")[-1].split(".")[0]
     stats_file_folder_path = osp.join(data_root, "shot_stats")
@@ -96,7 +97,7 @@ def main(args, video_path, data_root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Single Video ShotDetect")
     parser.add_argument('--video_dir', type=str, default='/home/tione/notebook/dataset/videos/train_5k_A')
-    parser.add_argument('--save_dir', type=str, default="/home/tione/notebook/dataset/videos/train_5k_A/shot_hsv", help="path to the saved data")
+    parser.add_argument('--save_dir', type=str, default="/home/tione/notebook/dataset/train_5k_A/shot_hsv", help="path to the saved data")
     parser.add_argument('--print_result', type = bool, default=True) #action="store_true")
     parser.add_argument('--save_keyf', type = bool, default=True) #      action="store_true")
     parser.add_argument('--save_keyf_txt', type = bool, default=True) #  action="store_true")

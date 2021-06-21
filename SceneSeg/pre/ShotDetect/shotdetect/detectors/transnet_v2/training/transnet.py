@@ -3,7 +3,7 @@ import h5py
 import numpy as np
 import tensorflow as tf
 
-from models.seg.lgss import ResNet18, ResNetBlock
+from lgss.models import ResNet18, ResNetBlock
 
 
 @gin.configurable(blacklist=["name"])
