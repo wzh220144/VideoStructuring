@@ -83,7 +83,7 @@ class MultiModalFeatureExtract(object):
                         start_frame = r_start_frame[i]
                         end_frame = r_end_frame[i]
                         index = r_index[i]
-                        feat_file = '{}/{}/{}#{}#{}#{}.npy'.format(youtube8m_dir, video_id, index, start_frame, end_frame, fps)
+                        feat_file = '{}/{}/{}#{}#{}.npy'.format(youtube8m_dir, video_id, start_frame, end_frame, int(fps))
                         np.save(feat_file, feats[i])
             end_time = time.time()
             cap.release()
@@ -218,7 +218,7 @@ class MultiModalFeatureExtract(object):
                 break
             index += 1
             if index in frames:
-                feat_file = '{}/{}/{}#{}#{}#{}.npy'.format(feat_dir, video_id, cnt, start_frame, index, fps)
+                feat_file = '{}/{}/{}#{}#{}.npy'.format(feat_dir, video_id, start_frame, index, int(fps))
                 if not os.path.exists(feat_file):
                     r_start_frame.append(start_frame)
                     r_end_frame.append(index)
