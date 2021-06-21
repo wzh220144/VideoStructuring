@@ -47,8 +47,10 @@ class Preprocessor(data.Dataset):
             self.fps_dict[video_id] = cap.get(cv2.CAP_PROP_FPS)
             cap.release()
             if os.path.exists(txt_path):
+                print(txt_path)
                 with open(txt_path, 'r') as f:
                     for index, line in enumerate(f):
+                        print(index, line)
                         cols = line.strip('\n').split(' ')
                         self.shot_frames[self.gen_key(video_id, strcal(index, 0))] = [int(x) for x in cols]
 
@@ -105,6 +107,7 @@ class Preprocessor(data.Dataset):
         shotid = ID['shotid']
         end_shot = int(ID['endshot'])
         end_frame = self.shot_frames[self.gen_key(imdbid, shotid)][1]
+        print()
         label = 0
         if 'annos_dict' in self.data_dict:
             label = self.data_dict["annos_dict"].get(imdbid).get(shotid, 0)

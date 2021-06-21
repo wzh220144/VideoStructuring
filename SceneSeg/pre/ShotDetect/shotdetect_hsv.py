@@ -18,7 +18,6 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 import glob
 def main(args, video_path, data_root):
-    print(data_root)
     video_path = osp.abspath(video_path)
     video_prefix = video_path.split("/")[-1].split(".")[0]
     stats_file_folder_path = osp.join(data_root, "shot_stats")

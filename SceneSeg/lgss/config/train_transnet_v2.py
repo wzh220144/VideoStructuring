@@ -43,4 +43,4 @@ testFlag = 0
 batch_size = 128
 epochs = 50
 logger = dict(log_interval=100, logs_dir="/home/tione/notebook/SceneSeg/{}".format(experiment_name))
-data_loader_kwargs = dict(num_workers=32, pin_memory=True, drop_last=True)
+data_loader_kwargs = dict(num_workers=14, pin_memory=True, drop_last=True)

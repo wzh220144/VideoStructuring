@@ -33,7 +33,7 @@ model = dict(
 optim = dict(name='Adam',
              setting=dict(lr=1e-3, weight_decay=5e-4))
 stepper = dict(name='MultiStepLR',
-               setting=dict(milestones=[25]))
+               setting=dict(milestones=[10, 25, 50]))
 loss = dict(weight=[0.5, 5])
 
 # runtime settings
@@ -41,6 +41,6 @@ resume = None
 trainFlag = 1
 testFlag = 0
 batch_size = 128
-epochs = 50
+epochs = 100
 logger = dict(log_interval=100, logs_dir="/home/tione/notebook/SceneSeg/{}".format(experiment_name))
-data_loader_kwargs = dict(num_workers=32, pin_memory=True, drop_last=True)
+data_loader_kwargs = dict(num_workers=14, pin_memory=True, drop_last=True)
