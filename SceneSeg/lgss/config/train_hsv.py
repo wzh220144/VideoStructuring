@@ -3,7 +3,7 @@ experiment_description = "scene segmentation with all modality"
 # overall confg
 data_root = '/home/tione/notebook/dataset/train_5k_A/shot_hsv'
 video_dir = '/home/tione/notebook/dataset/videos/train_5k_A'
-model_path = '/home/tione/notebool/dataset/model/seg/shot_hsv'
+model_path = '/home/tione/notebook/dataset/model/seg/shot_hsv'
 shot_frm_path = data_root + "/shot_txt"
 shot_num = 4  # even
 seq_len = 2  # even

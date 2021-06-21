@@ -3,7 +3,7 @@ from __future__ import print_function
 from mmcv import Config
 from tensorboardX import SummaryWriter
 
-import lgss.models as models
+import lgss.models.lgss as lgss
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--config', type=str,
                         default='/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/train_hsv.py')
     parser.add_argument('--annotation_file', type=str,
-                        default='/home/tione/notebook/dataset/structuring/GroundTruth/train5k.txt')
+                        default='/home/tione/notebook/dataset/GroundTruth/train5k.txt')
     args = parser.parse_args()
     return args
 
@@ -34,8 +34,7 @@ fps_dict = {}
 
 train_iter = 0
 
-def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap,
-          best_threshold):
+def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap, best_threshold):
     global train_iter
     model.train()
     labels = []
@@ -43,8 +42,8 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
     probs = []
     total_loss = 0.0
     cnt = 0
-    for batch_idx, (data_place, data_cast, data_act, data_aud, target, end_frames, video_ids) in enumerate(
-            train_loader):
+    for batch_idx, (data_place, data_cast, data_act, data_aud, target, end_frames, video_ids) in enumerate(train_loader):
+        #print(data_place, data_cast, data_act, data_aud, target, end_frames, video_ids)
         data_place = data_place.cuda() if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
         data_cast = data_cast.cuda() if 'cast' in cfg.dataset.mode else []
         data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
@@ -106,8 +105,7 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
             cnt = 0
 
         if batch_idx % 1000 == 0 and batch_idx != 0:
-            best_f1, best_ap, best_threshold = test(cfg, model, val_loader, criterion, best_f1, best_ap, best_threshold,
-                                                    epoch)
+            best_f1, best_ap, best_threshold = test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch)
 
     scheduler.step()
     return best_f1, best_ap, best_threshold
@@ -115,14 +113,14 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
 def test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch):
     global fps_dict
     print('start val...')
-    res, total_loss = lgss_util.inference(args, model, val_loader, criterion)
+    res, total_loss = lgss_util.inference(cfg, args, model, val_loader, criterion)
 
     cur_max_threshold = -1
     cur_max_f1 = 0
     is_best = False
     cur_max_ap = 0
     for threshold in np.arange(0, 1.01, 0.01).tolist():
-        auc, acc, recall, precision, ap, f1, avg_loss, f1_w = lgss_util.val(res, threshold, total_loss, args, fps_dict)
+        auc, acc, recall, precision, ap, f1, avg_loss, f1_w = lgss_util.val(cfg, res, threshold, total_loss, args, fps_dict)
         print(
             'threshold: {}, auc: {}, acc: {}, recall: {}, precision: {}, ap: {}, f1: {}, avg_loss: {}, f1_w: {}'.format(
                 threshold, auc, acc, recall, precision, ap, f1, avg_loss, f1_w))
@@ -143,7 +141,7 @@ def test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, ep
             cur_max_f1, best_f1, cur_max_ap, best_ap))
 
     save_checkpoint({'state_dict': model.state_dict(), 'epoch': epoch + 1, },
-                    is_best=is_best, fpath=osp.join(args.model_dir, 'checkpoint.pth.tar'))
+                    is_best=is_best, fpath=osp.join(cfg.model_path, 'checkpoint.pth.tar'))
     return best_f1, best_ap, best_threshold
 
 def main():
@@ -157,7 +155,7 @@ def main():
         val_data, batch_size=cfg.batch_size,
         shuffle=True, **cfg.data_loader_kwargs)
 
-    model = models.__dict__[cfg.model.name](cfg).cuda()
+    model = lgss.LGSS(cfg).cuda()
     model = nn.DataParallel(model)
 
     if cfg.resume is not None:
@@ -177,10 +175,8 @@ def main():
     best_ap = 0
     best_threshold = 0
     for epoch in range(1, cfg.epochs + 1):
-        best_f1, best_ap, best_f1_threshold = train(cfg, model, train_loader, optimizer, scheduler, epoch, criterion,
-                                                    best_f1, best_ap, best_threshold)
-        best_f1, best_ap, best_f1_threshold = test(cfg, model, val_loader, criterion, best_f1, best_ap, best_threshold,
-                                                   epoch)
+        best_f1, best_ap, best_f1_threshold = train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap, best_threshold)
+        best_f1, best_ap, best_f1_threshold = test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch)
 
 if __name__ == '__main__':
     main()

@@ -25,8 +25,6 @@ class Preprocessor(data.Dataset):
         self.listIDs = listIDs
         self.padding_head = 0
         # print(listIDs)
-        self.padding_tail = int(listIDs[-1][-1]["shotid"])
-        # print(self.padding_tail)
         self.data_root = cfg.data_root
         self.shot_boundary_range = range(-cfg.shot_num // 2 + 1, cfg.shot_num // 2 + 1)
         self.mode = cfg.dataset.mode
@@ -46,6 +44,7 @@ class Preprocessor(data.Dataset):
             video_path = os.path.join(cfg.video_dir, '{}.mp4'.format(video_id))
             cap = cv2.VideoCapture(video_path)
             self.frame_count_dict[video_id] = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            self.fps_dict[video_id] = cap.get(cv2.CAP_PROP_FPS)
             cap.release()
             if os.path.exists(txt_path):
                 with open(txt_path, 'r') as f:
@@ -82,7 +81,7 @@ class Preprocessor(data.Dataset):
                 aud_feats = torch.stack(aud_feats)
             labels = np.array(labels)
             end_frames = np.array(end_frames)
-            video_ids = np.array(video_ids)
+            video_ids = video_ids
             return place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids
         else:
             return self._get_single_item(ID_list)
@@ -104,6 +103,7 @@ class Preprocessor(data.Dataset):
     def _get_single_item(self, ID):
         imdbid = ID['imdbid']
         shotid = ID['shotid']
+        end_shot = int(ID['endshot'])
         end_frame = self.shot_frames[self.gen_key(imdbid, shotid)][1]
         label = 0
         if 'annos_dict' in self.data_dict:
@@ -114,8 +114,8 @@ class Preprocessor(data.Dataset):
             for ind in self.shot_boundary_range:
                 if int(shotid) + ind < 0:
                     name = 'shot_0000.npy'
-                elif int(shotid) + ind > self.padding_tail:
-                    name = 'shot_{}.npy'.format(str(self.padding_tail).zfill(4))
+                elif int(shotid) + ind > end_shot:
+                    name = 'shot_{}.npy'.format(str(end_shot).zfill(4))
                 else:
                     name = 'shot_{}.npy'.format(strcal(shotid, ind))
                 path = osp.join(self.data_root, 'place_feat/{}'.format(imdbid), name)
@@ -134,8 +134,8 @@ class Preprocessor(data.Dataset):
             for ind in self.shot_boundary_range:
                 if int(shotid) + ind < 0:
                     name = 'shot_0000.npy'
-                elif int(shotid) + ind > self.padding_tail:
-                    name = 'shot_{}.npy'.format(str(self.padding_tail).zfill(4))
+                elif int(shotid) + ind > end_shot:
+                    name = 'shot_{}.npy'.format(str(end_shot).zfill(4))
                 else:
                     name = 'shot_{}.npy'.format(strcal(shotid, ind))
                 path = osp.join(

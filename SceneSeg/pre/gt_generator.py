@@ -84,7 +84,7 @@ if __name__ == "__main__":
             for line in f:
                 shot_frame_list.append(int(line.strip().split()[1]))
 
-        if not shot_frame_list:
+        if len(shot_frame_list) == 0:
             print("file {} is empty".format(video_shot_txt))
             continue
         shot_dict[video_id] = shot_frame_list[:-1] 

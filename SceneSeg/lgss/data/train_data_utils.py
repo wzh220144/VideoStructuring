@@ -38,7 +38,6 @@ def data_partition(cfg, imdbidlist_json, annos_dict):
                 one_mode_idxs.append(one_idxs)
             '''
         idxs.append(one_mode_idxs)
-
     partition = {}
     partition['train'] = idxs[0]
     partition['val'] = idxs[1]

@@ -25,8 +25,10 @@ def call_back(rst):
 def run_mp42wav(args,video_id,shot_id):
     source_movie_fn = osp.join(args.source_video_path,video_id,"{}.mp4".format(shot_id))
     out_video_fn    = osp.join(args.save_wav_path,    video_id,"{}.wav".format(shot_id))
+    '''
     if not args.replace_old and osp.exists(out_video_fn):
         return 0
+    '''
     call_list  = ['ffmpeg']
     call_list += ['-v', 'error']
     call_list += ['-y']
@@ -47,8 +49,10 @@ def run_wav2stft(args,video_id,shot_id):
     k = 3  # sample episode num
     time_unit = 3  # unit: second
     feat_path = osp.join(args.save_stft_path, video_id, '{}.npy'.format(shot_id))
+    '''
     if not args.replace_old and osp.exists(feat_path):
         return 0
+    '''
     data, fs = librosa.core.load(osp.join(args.save_wav_path,video_id,"{}.wav".format(shot_id)), sr=16000)
     # normalize
     mean = (data.max() + data.min()) / 2
@@ -85,6 +89,9 @@ def run_wav2stft(args,video_id,shot_id):
     np.save(feat_path, freq)
 
 def run(args,video_id,shot_id):
+    feat_path = osp.join(args.save_stft_path, video_id, '{}.npy'.format(shot_id))
+    if not args.replace_old and osp.exists(feat_path):
+        return 0
     run_mp42wav(args,video_id,shot_id)
     run_wav2stft(args,video_id,shot_id)
 
@@ -111,8 +118,10 @@ def main(args):
     pool = multiprocessing.Pool(processes=args.max_workers) 
     for video_id in video_list:
         shot_id_mp4_list = os.listdir(osp.join(args.source_video_path,video_id))
+        '''
         if osp.exists(osp.join(args.save_wav_path,video_id)) and osp.exists(osp.join(args.save_stft_path,video_id)):
             continue
+        '''
         os.makedirs(osp.join(args.save_wav_path,video_id),exist_ok = True)
         os.makedirs(osp.join(args.save_stft_path,video_id),exist_ok = True)
         for shot_id_mp4 in shot_id_mp4_list:

@@ -32,7 +32,9 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
 
-resnet50_model_path = "/home/tione/notebook/VideoStructuring/pretrained/lgss/src/models/resnet50-19c8e357.pth"
+os.environ["CUDA_VISIBLE_DEVICES"]='0'
+
+resnet50_model_path = "/home/tione/notebook/VideoStructuring/pretrained/resnet50-19c8e357.pth"
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -262,6 +264,7 @@ class Extractor(object):
 
         end = time.time()
         for i, (imgs, fnames) in enumerate(data_loader):
+            imgs = imgs.cuda()
             data_time.update(time.time() - end)
             outputs = self.model(imgs)
 
@@ -312,13 +315,23 @@ class Preprocessor(object):
         return img, fname
 
 
-def get_data(video_id, img_path, batch_size, workers):
-
-    dataset = os.listdir(img_path)    # image nums
-    if len(dataset) % batch_size < 8:   #保持完成batch size
-        for i in range(8 - len(dataset) % batch_size):
+def get_data(video_id, img_path, batch_size, workers, keyf_num):
+    dataset = []
+    tmp = {}
+    for x in os.listdir(img_path):    # image nums
+        #shot_0023_img_4.jpg
+        cols = x.split('/')[-1].split('.')[0].split('_')
+        num = int(cols[3])
+        if num <= keyf_num:
+            if cols[1] not in tmp:
+                tmp[cols[1]] = num
+            tmp[cols[1]] = max(num, tmp[cols[1]])
+    for k, v in tmp.items():
+        dataset.append('shot_{}_img_{}.jpg'.format(k, v))
+    if len(dataset) % batch_size < batch_size:   #保持完成batch size
+        for i in range(batch_size - len(dataset) % batch_size):
             dataset.append(dataset[-1])
-
+    print(len(dataset), dataset)
     # data transforms, Imagenet mean and std
     normalizer = transforms.Normalize(
         mean=[0.485, 0.456, 0.406],
@@ -350,20 +363,24 @@ def get_img_folder(data_root, video_id):
 
 def run(extractor, video_id, video_list, idx_m, args):
     print('****** {}, {} / {}, {} ******'.format(datetime.now(), idx_m+1, len(video_list), video_id))
+    '''
     save_path = osp.join(args.save_path, video_id)
     os.makedirs(save_path, exist_ok=True)
+    '''
     img_path = get_img_folder(args.source_img_path, video_id)    # video/image_path
     if not osp.isdir(img_path): #img没有生成, 先暂时return
         print('Cannot find images!')
         return
 
+    '''
     feat_save_name = osp.join(save_path, 'feat.pkl')
     score_save_name = osp.join(save_path, 'score.pkl')
     if osp.isfile(feat_save_name) and osp.isfile(score_save_name):
         print('{}, {} exist.'.format(datetime.now(), video_id))
         return
+    '''
     # create data loaders
-    dataset, data_loader = get_data(video_id, img_path, args.batch_size, args.workers)
+    dataset, data_loader = get_data(video_id, img_path, args.batch_size, args.workers, args.keyf_num)
 
     # extract feature
     try:
@@ -373,28 +390,19 @@ def run(extractor, video_id, video_list, idx_m, args):
             item = to_numpy(item)
             os.makedirs(osp.join(args.save_feat_path,video_id),exist_ok = True)
             img_ind = key.split("_")[-1].split(".jpg")[0]
-            if args.save_one_frame_feat:
-                if img_ind is "0":
-                    shot_ind = key.split("_")[1]
-                    if not os.path.exists(osp.join(args.source_img_path,video_id,"shot_{}_img_1.jpg".format(shot_ind))):                                         
-                        save_fn = osp.join(args.save_feat_path,video_id,"shot_{}.npy".format(shot_ind))
-                        np.save(save_fn,item)
-                                      
-                if img_ind is "1":
-                    shot_ind = key.split("_")[1]
-                    save_fn = osp.join(args.save_feat_path,video_id,"shot_{}.npy".format(shot_ind))
-                    np.save(save_fn,item)                    
-                else:
-                    continue
-            else:
-                save_fn = osp.join(args.save_feat_path,video_id,"{}.npy".format(key.split(".jpg")[0]))
-                np.save(save_fn,item)
+            
+            #只生成一个key frame特征
+            shot_ind = key.split("_")[1]
+            save_fn = osp.join(args.save_feat_path,video_id,"shot_{}.npy".format(shot_ind))
+            np.save(save_fn,item)                    
                     
+        '''
         print('{}, saving...'.format(datetime.now()))
         with open(feat_save_name, 'wb') as f:
             pickle.dump(feat_dict, f)
         with open(score_save_name, 'wb') as f:
             pickle.dump(score_dict, f)
+        '''
     except Exception as e:
         print('{} error! {}'.format(video_id, e))
     print('\n')
@@ -433,11 +441,12 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Place feature using ResNet50 with ImageNet pretrain")
     parser.add_argument('--use_gpu', type=int, default=0)
-    parser.add_argument('--max_worker', type=int, default=80)
-    parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/videos/train_5k_A/shot_hsv")
+    parser.add_argument('--max_worker', type=int, default=5)
+    parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/train_5k_A/shot_hsv")
     parser.add_argument('--save-one-frame-feat', type=bool, default=True)
-    parser.add_argument('-b', '--batch-size', type=int, default=512)
+    parser.add_argument('-b', '--batch-size', type=int, default=32)
     parser.add_argument('-j', '--workers', type=int, default=2)
+    parser.add_argument('--keyf_num', type=int, default=2)
     # parser.add_argument('--list_file', type=str, default=osp.join(data_root,'meta/list_test.txt'),
                         # help='The list of videos to be processed,\
                         # in the form of xxxx0.mp4\nxxxx1.mp4\nxxxx2.mp4\n \

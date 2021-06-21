@@ -28,7 +28,10 @@ def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, dat
     labels = to_numpy(target).tolist()
     probs = to_numpy(prob)
     end_frames = to_numpy(end_frames.view(-1)).tolist()
-    video_ids = to_numpy(video_ids.view(-1)).tolist()
+    t = []
+    for x in video_ids:
+        t.extend(x)
+    video_ids = t
     other = []
     for i in range(len(labels)):
         other.append((labels[i], probs[i], end_frames[i], video_ids[i]))
