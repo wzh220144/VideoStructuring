@@ -1,7 +1,9 @@
 from __future__ import print_function
+from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Manager, Process
 from lgss.utils import read_json, read_txt_list, strcal
 from lgss.utils.package import *
+import tqdm
 
 def data_partition(cfg, imdbidlist_json, annos_dict):
     assert (cfg.seq_len % 2 == 0)
@@ -96,14 +98,12 @@ def data_pre(cfg):
     casts_dict_raw = mgr.dict()
     annos_dict_raw = mgr.dict()
     annos_valid_dict_raw = mgr.dict()
-    jobs = [Process(
-        target=data_pre_one,
-        args=(cfg, imdbid, acts_dict_raw, casts_dict_raw, annos_dict_raw, annos_valid_dict_raw))
-        for imdbid in imdbidlist]
-    for j in jobs:
-        j.start()
-    for j in jobs:
-        j.join()
+    ps = []
+    with ThreadPoolExecutor(max_workers = 30) as executor:
+        for imdbid in imdbidlist:
+            ps.append(executor.submit(data_pre_one, cfg, imdbid, acts_dict_raw, casts_dict_raw, annos_dict_raw, annos_valid_dict_raw))
+        for p in tqdm.tqdm(ps):
+            p.result()
 
     annos_dict, annos_valid_dict = {}, {}
     acts_dict, casts_dict = {}, {}

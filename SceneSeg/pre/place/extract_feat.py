@@ -315,7 +315,8 @@ class Preprocessor(object):
         return img, fname
 
 
-def get_data(video_id, img_path, batch_size, workers, keyf_num):
+def get_data(video_id, img_path, batch_size, workers, keyf_num, args):
+    has_data = False
     dataset = []
     tmp = {}
     for x in os.listdir(img_path):    # image nums
@@ -327,7 +328,13 @@ def get_data(video_id, img_path, batch_size, workers, keyf_num):
                 tmp[cols[1]] = num
             tmp[cols[1]] = max(num, tmp[cols[1]])
     for k, v in tmp.items():
+        save_fn = osp.join(args.save_feat_path, video_id, "shot_{}.npy".format(k))
+        if os.path.exists(save_fn):
+            continue
         dataset.append('shot_{}_img_{}.jpg'.format(k, v))
+        has_data = True
+    if not has_data:
+        return has_data, dataset, None
     if len(dataset) % batch_size < batch_size:   #保持完成batch size
         for i in range(batch_size - len(dataset) % batch_size):
             dataset.append(dataset[-1])
@@ -349,7 +356,7 @@ def get_data(video_id, img_path, batch_size, workers, keyf_num):
         batch_size=batch_size, num_workers=workers,
         shuffle=False, pin_memory=True)
 
-    return dataset, data_loader
+    return has_data, dataset, data_loader
 
 
 def get_img_folder(data_root, video_id):
@@ -380,7 +387,10 @@ def run(extractor, video_id, video_list, idx_m, args):
         return
     '''
     # create data loaders
-    dataset, data_loader = get_data(video_id, img_path, args.batch_size, args.workers, args.keyf_num)
+    has_data, dataset, data_loader = get_data(video_id, img_path, args.batch_size, args.workers, args.keyf_num, args)
+    if not has_data:
+        print('{} place feat has been extract.'.format(video_id))
+        return
 
     # extract feature
     try:
@@ -440,7 +450,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Place feature using ResNet50 with ImageNet pretrain")
-    parser.add_argument('--use_gpu', type=int, default=0)
+    parser.add_argument('--use_gpu', type=int, default=1)
     parser.add_argument('--max_worker', type=int, default=5)
     parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/train_5k_A/shot_hsv")
     parser.add_argument('--save-one-frame-feat', type=bool, default=True)

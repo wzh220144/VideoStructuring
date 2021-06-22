@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 from lgss.utils import read_json, read_pkl, read_txt_list, strcal
 from lgss.utils.package import *
 import cv2
+import tqdm
 
 normalizer = transforms.Normalize(
     mean=[0.485, 0.456, 0.406],
@@ -39,18 +40,19 @@ class Preprocessor(data.Dataset):
             for xx in x:
                 video_ids.add(xx['imdbid'])
         shot_txt_dir = os.path.join(cfg.data_root, 'shot_txt')
-        for video_id in video_ids:
+        video_info_dict = {}
+        with open(cfg.video_dir + '.info', 'r') as f:
+            video_info_dict = json.load(f)
+        for video_id in tqdm.tqdm(video_ids):
             txt_path = os.path.join(shot_txt_dir, '{}.txt'.format(video_id))
             video_path = os.path.join(cfg.video_dir, '{}.mp4'.format(video_id))
-            cap = cv2.VideoCapture(video_path)
-            self.frame_count_dict[video_id] = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-            self.fps_dict[video_id] = cap.get(cv2.CAP_PROP_FPS)
-            cap.release()
+            self.frame_count_dict[video_id] = video_info_dict[video_id]['frame_count']
+            self.fps_dict[video_id] = video_info_dict[video_id]['fps']
             if os.path.exists(txt_path):
-                print(txt_path)
+                #print(txt_path)
                 with open(txt_path, 'r') as f:
                     for index, line in enumerate(f):
-                        print(index, line)
+                        #print(index, line)
                         cols = line.strip('\n').split(' ')
                         self.shot_frames[self.gen_key(video_id, strcal(index, 0))] = [int(x) for x in cols]
 
@@ -181,10 +183,14 @@ class Preprocessor(data.Dataset):
         '''
 
 def get_train_data(cfg):
+    print('start data pre')
     imdbidlist_json, annos_dict, annos_valid_dict, casts_dict, acts_dict = train_data_utils.data_pre(cfg)
+    print('start data partition')
     partition = train_data_utils.data_partition(cfg, imdbidlist_json, annos_valid_dict)
     data_dict = {"annos_dict": annos_dict, "casts_dict": casts_dict, "acts_dict": acts_dict}
+    print('start train data pre process')
     train_data = Preprocessor(cfg, partition['train'], data_dict)
+    print('start val data pre process')
     val_data = Preprocessor(cfg, partition['val'], data_dict)
     return train_data, val_data
 
