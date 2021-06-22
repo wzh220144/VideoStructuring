@@ -32,6 +32,9 @@ class SegDataset(Dataset):
         '''
         self.use_cache = use_cache
 
+        self.empty_youtube8m = np.zeros(1024)
+        self.empty_stft = np.zeros((257, 90))
+
 
     def pre(self):
         with ThreadPoolExecutor(max_workers=50) as executor:
@@ -80,28 +83,28 @@ class SegDataset(Dataset):
         return youtube8m_feat, stft_feat, label, video_id, index, ts
 
     def get_youtube8m_feat_without_cache(self, video_id, index):
-        feat_path = os.path.join(self.youtube8m_feats_dir, '{}{}'.format(video_id, index))
-        if os.path.exists(feat_path):
+        feat_path = os.path.join(self.youtube8m_feats_dir, '{}/{}'.format(video_id, index))
+        if os.path.exists(feat_path) and index != '':
             try:
                 return np.load(feat_path)
             except:
                 print('load {} failed.'.format(feat_path))
-                return np.zeros(1024)
+                return self.empty_youtube8m
         else:
-            print('{} not exist.'.format(feat_path))
-            return np.zeros(1024)
+            #print('{} not exist.'.format(feat_path))
+            return self.empty_youtube8m
 
     def get_stft_feat_without_cache(self, video_id, index):
-        feat_path = os.path.join(self.stft_feats_dir, '{}{}'.format(video_id, index))
-        if os.path.exists(feat_path):
+        feat_path = os.path.join(self.stft_feats_dir, '{}/{}'.format(video_id, index))
+        if os.path.exists(feat_path) and index != '':
             try:
                 return np.load(feat_path)
             except:
                 print('load {} failed'.format(feat_path))
-                return np.zeros((257, 90))
+                return self.empty_stft
         else:
-            print('{} not exist.'.format(feat_path))
-            return np.zeros((257, 90))
+            #print('{} not exist.'.format(feat_path))
+            return self.empty_stft
 
     @cached(cache=LRUCache(maxsize=youtube8m_cache_size))
     def get_youtube8m_feat(self, video_id, index):
