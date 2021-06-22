@@ -49,7 +49,7 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
         data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
         data_aud = data_aud.cuda() if 'aud' in cfg.dataset.mode else []
         target = target.view(-1).cuda()
-        print(len(target))
+        #print(len(target))
         optimizer.zero_grad()
         output = model(data_place, data_cast, data_act, data_aud)
         output = output.view(-1, 2)
@@ -177,8 +177,8 @@ def main():
     best_ap = 0
     best_threshold = 0
     for epoch in range(1, cfg.epochs + 1):
-        best_f1, best_ap, best_f1_threshold = train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap, best_threshold)
         best_f1, best_ap, best_f1_threshold = test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch)
+        best_f1, best_ap, best_f1_threshold = train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap, best_threshold)
 
 if __name__ == '__main__':
     main()

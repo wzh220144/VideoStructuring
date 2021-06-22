@@ -21,7 +21,7 @@ def data_partition(cfg, imdbidlist_json, annos_dict):
                 padding_left = (new_len - len(shotid_list)) // 2
                 padding_right = new_len - len(shotid_list) - padding_left
                 shotid_list = [shotid_list[0]] * padding_left + shotid_list + [shotid_list[-1]] * padding_right
-            # print(imdbid, shotid_list)
+            #print(imdbid, shotid_list)
             end_shot = shotid_list[-1]
             for i in range(len(shotid_list) // cfg.seq_len):
                 one_idxs = []

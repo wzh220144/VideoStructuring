@@ -17,7 +17,22 @@ import tqdm
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 import glob
+
+def get_shots_from_cuts(cut_list, base_timecode):
+    shot_list = []
+    last_cut = base_timecode + 0
+    for cut in cut_list:
+        cut = base_timecode + cut
+        shot_list.append((last_cut, cut))
+        last_cut = cut
+    return shot_list
+
 def main(args, video_path, data_root):
+    video_id = video_path.split('/')[-1].split(".mp4")[0]
+    if video_id != '9771be7df83130e34e231e294ebf67b9':
+        return
+
+    #print("...cutting shots for ", video_path)
     video_path = osp.abspath(video_path)
     video_prefix = video_path.split("/")[-1].split(".")[0]
     stats_file_folder_path = osp.join(data_root, "shot_stats")
@@ -39,7 +54,7 @@ def main(args, video_path, data_root):
     try:
         # If stats file exists, load it.
         if osp.exists(stats_file_path):
-            return # skip if exists
+            #return # skip if exists
             # Read stats from CSV file opened in read mode:
             with open(stats_file_path, 'r') as stats_file:
                 stats_manager.load_from_csv(stats_file, base_timecode)
@@ -52,13 +67,24 @@ def main(args, video_path, data_root):
         # Start video_manager.
         video_manager.start()
 
-        # Perform shot detection on video_manager.
-        shot_manager.detect_shots(frame_source=video_manager)
+        shot_txt_path = osp.join(data_root, "shot_txt", "{}.txt".format(video_prefix))
+        if  os.path.exists(shot_txt_path):
+            with open(shot_txt_path, 'r') as f:
+                cut_list = []
+                for line in f:
+                    line = line.strip('\n')
+                    cols = line.split(' ')
+                    cut_list.append(int(cols[1]) + 1)
+            shot_list = get_shots_from_cuts(cut_list, base_timecode)
+        else:
+            # Perform shot detection on video_manager.
+            shot_manager.detect_shots(frame_source=video_manager)
 
-        # Obtain list of detected shots.
-        shot_list = shot_manager.get_shot_list(base_timecode)
-        # Each shot is a tuple of (start, end) FrameTimecodes.
+            # Obtain list of detected shots.
+            shot_list = shot_manager.get_shot_list(base_timecode)
+            # Each shot is a tuple of (start, end) FrameTimecodes.
         if args.print_result:
+            '''
             print('List of shots obtained:')
             for i, shot in enumerate(shot_list):
                 print(
@@ -66,6 +92,7 @@ def main(args, video_path, data_root):
                         i,
                         shot[0].get_timecode(), shot[0].get_frames(),
                         shot[1].get_timecode(), shot[1].get_frames(),))
+            '''
         # Save keyf img for each shot
         if args.save_keyf:
             output_dir = osp.join(data_root, "shot_keyf", video_prefix)
@@ -74,8 +101,9 @@ def main(args, video_path, data_root):
         # Save keyf txt of frame ind
         if args.save_keyf_txt:
             output_dir = osp.join(data_root, "shot_txt", "{}.txt".format(video_prefix))
-            mkdir_ifmiss(osp.join(data_root, "shot_txt"))
-            generate_images_txt(shot_list, output_dir, num_images=5)
+            if not os.path.exists(output_dir):
+                mkdir_ifmiss(osp.join(data_root, "shot_txt"))
+                generate_images_txt(shot_list, output_dir, num_images=5)
 
         # Split video into shot video
         if args.split_video:
@@ -114,10 +142,10 @@ if __name__ == '__main__':
     results = []
     with ThreadPoolExecutor(max_workers=80) as executor:
         for video_path in glob.glob(args.video_dir+'/*.mp4'):
-            print("...cutting shots for ", video_path)
             video_id = video_path.split('/')[-1].split(".mp4")[0]
             results.append(executor.submit(main, args, video_path, args.save_dir))
-        results = [res.result() for res in results]
+        for res in tqdm.tqdm(results):
+            res.result()
      
 #     results = []
 #     with ThreadPoolExecutor(max_workers=32) as executor:

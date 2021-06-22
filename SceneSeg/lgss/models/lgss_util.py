@@ -19,6 +19,7 @@ def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, dat
     target = target.view(-1).cuda()
 
     output = model(data_place, data_cast, data_act, data_aud)
+    #print(data_place.shape, target.shape, output.shape)
     output = output.view(-1, 2)
     loss = criterion(output, target)
 
@@ -29,8 +30,10 @@ def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, dat
     probs = to_numpy(prob)
     end_frames = to_numpy(end_frames.view(-1)).tolist()
     t = []
-    for x in video_ids:
-        t.extend(x)
+    #print(video_ids, labels, probs, end_frames)
+    for i in range(video_ids[0]):
+        for x in video_ids:
+            t.append(x[i])
     video_ids = t
     other = []
     for i in range(len(labels)):
@@ -68,6 +71,7 @@ def val(cfg, res, threshold, total_loss, args, fps_dict):
     for x in res:
         video_id = x[3]
         video_ids.add(video_id)
+        #print(x[2], video_id, fps_dict[video_id])
         ts = float(x[2]) / fps_dict[video_id]
         prob = x[1]
         if video_id not in video_predicts:
@@ -90,7 +94,7 @@ def val(cfg, res, threshold, total_loss, args, fps_dict):
     for video_id in video_ids:
         true_gts = [x['segment'][1] for x in annotation_dict['{}.mp4'.format(video_id)]['annotations'][:-1]]
         predict_gts = video_predicts[video_id]
-        print(video_id, true_gts, predict_gts)
+        #print(video_id, true_gts, predict_gts)
         t_id = 0
         p_id = 0
         t_len = len(true_gts)

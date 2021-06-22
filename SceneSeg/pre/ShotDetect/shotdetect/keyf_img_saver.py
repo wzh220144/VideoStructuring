@@ -71,10 +71,6 @@ def generate_images(video_manager, shot_list, output_dir, num_images=3,
     # Setup flags and init progress bar if available.
     completed = True
     logging.info('Generating output images (%d per shot)...', num_images)
-    progress_bar = None
-    if tqdm and not quiet_mode:
-        progress_bar = tqdm(
-            total=len(shot_list) * num_images, unit='images', desc="Save Keyf")
 
     filename_template = Template(image_name_template)
 
@@ -88,10 +84,12 @@ def generate_images(video_manager, shot_list, output_dir, num_images=3,
     for i in range(len(shot_list)):
         timecode_list[i] = []
 
+    cnt = 0
     if num_images == 1:
         for i, (start_time, end_time) in enumerate(shot_list):
             duration = end_time - start_time
             timecode_list[i].append(start_time + int(duration.get_frames() / 2))
+            cnt += len(timecode_list[i])
 
     else:
         middle_images = num_images - 2  # minus the start and the end
@@ -108,6 +106,11 @@ def generate_images(video_manager, shot_list, output_dir, num_images=3,
             # End FrameTimecode is always the same frame as the next shot's start_time
             # (one frame past the end), so we need to subtract 1 here.
             timecode_list[i].append(end_time - 1)
+            cnt += len(timecode_list[i])
+
+    t = len(os.listdir(output_dir))
+    if cnt == len(os.listdir(output_dir)):
+        return
 
     for i in timecode_list:
         for j, image_timecode in enumerate(timecode_list[i]):
@@ -125,8 +128,6 @@ def generate_images(video_manager, shot_list, output_dir, num_images=3,
             else:
                 completed = False
                 break
-            if progress_bar:
-                progress_bar.update(1)
 
     if not completed:
         logging.error('Could not generate all output images.')

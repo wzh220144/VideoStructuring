@@ -7,7 +7,7 @@ model_path = '/home/tione/notebook/dataset/model/seg/shot_hsv'
 shot_frm_path = data_root + "/shot_txt"
 shot_num = 4  # even
 seq_len = 2  # even
-gpus = "0,1"
+gpus = "0"
 
 # dataset settings
 dataset = dict(

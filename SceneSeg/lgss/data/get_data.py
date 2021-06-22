@@ -109,7 +109,6 @@ class Preprocessor(data.Dataset):
         shotid = ID['shotid']
         end_shot = int(ID['endshot'])
         end_frame = self.shot_frames[self.gen_key(imdbid, shotid)][1]
-        print()
         label = 0
         if 'annos_dict' in self.data_dict:
             label = self.data_dict["annos_dict"].get(imdbid).get(shotid, 0)
