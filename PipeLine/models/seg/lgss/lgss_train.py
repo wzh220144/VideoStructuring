@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import models.seg.lgss.lgss_util as lgss_util
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
 
 train_iter = 0
 val_iter = 0
@@ -97,12 +97,15 @@ def train(args, model, data_loader, optimizer, scheduler, epoch, criterion, val_
             probs = []
             total_loss = 0
             cnt = 0
+    
 
+        '''
         if batch_idx % 1000 == 0 and batch_idx != 0:
         #if batch_idx % 10000 == 0:
             best_f1, best_threshold = test(args, model, val_loader, best_f1, best_threshold, criterion, epoch)
+        '''
 
-        scheduler.step()
+    scheduler.step()
     return best_f1, best_threshold
 
 def main():
@@ -114,7 +117,7 @@ def main():
     parser.add_argument('--feats_dir', type = str, default = '/home/tione/notebook/VideoStructuring/dataset/feats')
     parser.add_argument('--youtube8m_cache_size', type = int, default = 10000)
     parser.add_argument('--stft_cache_size', type = int, default = 10000)
-    parser.add_argument('--batch_size', type = int, default = 32)
+    parser.add_argument('--batch_size', type = int, default = 128)
     parser.add_argument('--extract_youtube8m', type = bool, default = True)
     parser.add_argument('--extract_stft', type = bool, default = True)
     parser.add_argument('--youtube8m_ratio', type = float, default = 0.8)
@@ -149,14 +152,16 @@ def main():
 
     train_loader = DataLoader(
             SegDataset(train_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 3,
-            prefetch_factor = 1,
-            batch_size=args.batch_size, 
+            num_workers = 14,
+            prefetch_factor = 2,
+            batch_size=args.batch_size,
+            pin_memory=True,
             shuffle=True)
     val_loader = DataLoader(
             SegDataset(val_samples_path, args.extract_youtube8m, args.extract_stft, 'train_5k_A', args.feats_dir, False), 
-            num_workers = 5,
+            num_workers = 14,
             prefetch_factor = 1,
+            pin_memory=True,
             batch_size=20, shuffle=False)
 
     model = LGSS(args)
@@ -168,7 +173,7 @@ def main():
         model.load_state_dict(checkpoint['state_dict'])
 
     optimizer = Adam(model.parameters(), lr = 1e-3, weight_decay=5e-4)
-    scheduler = MultiStepLR(optimizer, milestones = [10000, 50000, 100000])
+    scheduler = MultiStepLR(optimizer, milestones = [5, 20, 40])
     criterion = nn.CrossEntropyLoss(torch.Tensor([0.5, 5]))
     if args.use_gpu == 1:
         criterion = criterion.cuda()
