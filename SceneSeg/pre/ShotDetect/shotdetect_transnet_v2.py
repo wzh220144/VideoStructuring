@@ -106,10 +106,15 @@ def get_shots_from_cuts(cut_list, base_timecode, num_frames, start_frame = 0):
     # Initialize last_cut to the first frame we processed,as it will be
     # the start timecode for the first shot in the list.
     last_cut = base_timecode + start_frame
+    t = 0
     for cut in cut_list:
         cut = base_timecode + cut
         shot_list.append((last_cut, cut))
         last_cut = cut
+        t = cut
+    if t != num_frames:
+        shot_list.append((last_cut, base_timecode + num_frames))
+
     # Last shot is from last cut to end of video.
     shot_list.append((last_cut, base_timecode + num_frames))
     return shot_list
@@ -134,7 +139,7 @@ def main(device, model, args, video_path, data_root):
                     if x[1] and x[0] + 1 != frame_count:
                         cut_list.append(x[0])
         # Obtain list of detected shots.
-        shot_list = get_shots_from_cuts(cut_list, base_timecode, frame_count)
+        shot_list = get_shots_from_cuts(cut_list, base_timecode, int(frame_count))
 
         # Set downscale factor to improve processing speed.
         if args.keep_resolution:

@@ -90,6 +90,7 @@ def val(cfg, res, threshold, total_loss, args, fps_dict):
     for video_id in video_ids:
         true_gts = [x['segment'][1] for x in annotation_dict['{}.mp4'.format(video_id)]['annotations'][:-1]]
         predict_gts = video_predicts[video_id]
+        print(video_id, true_gts, predict_gts)
         t_id = 0
         p_id = 0
         t_len = len(true_gts)
@@ -115,5 +116,5 @@ def val(cfg, res, threshold, total_loss, args, fps_dict):
     f1_w = 0
     if t1 + t2 > 0:
         f1_w = 2 * t1 * t2 / (t1 + t2)
-    print(tp, pt, rt)
+    #print(tp, pt, rt)
     return auc, acc, recall, precision, ap, f1, avg_loss, f1_w

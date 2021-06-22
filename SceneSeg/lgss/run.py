@@ -49,6 +49,7 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
         data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
         data_aud = data_aud.cuda() if 'aud' in cfg.dataset.mode else []
         target = target.view(-1).cuda()
+        print(len(target))
         optimizer.zero_grad()
         output = model(data_place, data_cast, data_act, data_aud)
         output = output.view(-1, 2)
@@ -134,6 +135,7 @@ def test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, ep
         if ap > best_ap:
             best_ap = ap
         if ap > cur_max_ap:
+            is_best = True
             cur_max_ap = ap
     print(
         'epoch {}: \tcur_max_threshold:{:.6f}, best_threshold: {:.6f}, cur_max_f1: {:.6f}, best_f1: {:.6f}, cur_max_ap: {:.6f}, best_ap: {:.6f}'.format(

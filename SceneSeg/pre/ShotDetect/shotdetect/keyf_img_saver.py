@@ -49,7 +49,7 @@ def generate_images(video_manager, shot_list, output_dir, num_images=3,
                     image_name_template='shot_${SHOT_NUMBER}_img_${IMAGE_NUMBER}',
                     ):
     # type: (List[Tuple[FrameTimecode, FrameTimecode]) -> None
-    assert num_images >= 3
+    assert num_images >= 3 or num_images == 1
     mkdir_ifmiss(output_dir)
     quiet_mode = False
     imwrite_params = get_cv2_imwrite_params()
@@ -132,11 +132,13 @@ def generate_images(video_manager, shot_list, output_dir, num_images=3,
         logging.error('Could not generate all output images.')
 
 
-def generate_images_txt(shot_list, output_dir, num_images=5):
+def generate_images_txt(shot_list, output_dir, num_images=3):
     assert num_images >= 3
     timecode_list = dict()
+
     for i in range(len(shot_list)):
         timecode_list[i] = []
+
     middle_images = num_images - 2  # minus the start and the end
     for i, (start_time, end_time) in enumerate(shot_list):
         timecode_list[i].append(start_time)
