@@ -99,6 +99,7 @@ class TransNetV2:
 
 def get_shots_from_cuts(cut_list, base_timecode, num_frames, start_frame = 0):
     # shot list, where shots are tuples of (Start FrameTimecode, End FrameTimecode).
+    print(cut_list)
     shot_list = []
     if not cut_list:
         shot_list.append((base_timecode + start_frame, base_timecode + num_frames))
@@ -108,10 +109,10 @@ def get_shots_from_cuts(cut_list, base_timecode, num_frames, start_frame = 0):
     last_cut = base_timecode + start_frame
     t = 0
     for cut in cut_list:
+        t = cut
         cut = base_timecode + cut
         shot_list.append((last_cut, cut))
         last_cut = cut
-        t = cut
     if t != num_frames:
         shot_list.append((last_cut, base_timecode + num_frames))
 
@@ -226,6 +227,8 @@ if __name__ == '__main__':
             model = models[t]
             print("...cutting shots for ", video_path)
             video_id = video_path.split('/')[-1].split(".mp4")[0]
+            if video_id != 'c9cc5b0ef4730e519296e7af9f369a8c':
+                continue
             results.append(executor.submit(main, device, model, args, video_path, args.save_dir))
         results = [res.result() for res in results]
      

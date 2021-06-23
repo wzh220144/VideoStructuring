@@ -45,10 +45,10 @@ def get_shots_from_cuts(cut_list, base_timecode, num_frames, start_frame = 0):
     last_cut = base_timecode + start_frame
     t = 0
     for cut in cut_list:
+        t = cut
         cut = base_timecode + cut
         shot_list.append((last_cut, cut))
         last_cut = cut
-        t = cut
     # Last shot is from last cut to end of video.
     if t != num_frames:
         shot_list.append((last_cut, base_timecode + num_frames))

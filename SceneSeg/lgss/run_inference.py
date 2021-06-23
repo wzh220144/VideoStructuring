@@ -93,7 +93,8 @@ if __name__ == '__main__':
         video_name = x[3]
         if video_name not in video_inference_res:
             video_inference_res[video_name] = {}
-        video_inference_res[video_name][str(end_frame)] = {'prob': prob, 'label': label}
+        video_inference_res[video_name][str(end_frame)] = {'prob': prob.item(), 'label': label}
+    os.makedirs(os.path.join(cfg.data_root, "seg_results"), exist_ok=True)
     for video_name, value in video_inference_res.items():
         log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
         with open(log_path, 'w') as f:

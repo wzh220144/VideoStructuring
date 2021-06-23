@@ -96,7 +96,7 @@ def get_mAP_seq(loader, gts_raw, preds_raw):
         # print(mAP)
     return np.mean(mAP), np.array(mAP)
 
-def scene2video(cfg, scene_list, video_name):
+def scene2video(cfg, scene_list, args, video_name):
     source_movie_fn = '{}.mp4'.format(osp.join(cfg.video_dir, video_name))
     vcap = cv2.VideoCapture(source_movie_fn)
     fps = vcap.get(cv2.CAP_PROP_FPS)

@@ -10,7 +10,7 @@ shot_frm_path = data_root + "/shot_txt"
 video_name = "test"
 shot_num = 6
 seq_len = 2
-gpus = "1"
+gpus = "0,1"
 
 # dataset settings
 dataset = dict(
@@ -43,7 +43,7 @@ loss = dict(weight=[0.5, 5])
 resume = None
 trainFlag = False
 testFlag = True
-batch_size = 1
+batch_size = 128
 epochs = 30
 logger = dict(log_interval=200, logs_dir="/home/tione/notebook/SceneSeg/{}".format(experiment_name))
 data_loader_kwargs = dict(num_workers=1, pin_memory=True, drop_last=False)
