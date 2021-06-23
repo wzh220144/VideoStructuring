@@ -99,7 +99,6 @@ class TransNetV2:
 
 def get_shots_from_cuts(cut_list, base_timecode, num_frames, start_frame = 0):
     # shot list, where shots are tuples of (Start FrameTimecode, End FrameTimecode).
-    print(cut_list)
     shot_list = []
     if not cut_list:
         shot_list.append((base_timecode + start_frame, base_timecode + num_frames))
