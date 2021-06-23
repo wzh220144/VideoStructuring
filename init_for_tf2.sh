@@ -105,6 +105,7 @@ pwd
 
 # tensorflow 1.14
 #pip config set global.index-url https://mirrors.tencent.com/pypi/simple/
+pip install torch==1.8.1+cu101 torchvision==0.9.1+cu101 torchaudio -f https://download.pytorch.org/whl/torch_stable.html
 sudo apt-get install swig libpulse-dev libasound2-dev
 pip install -r requirement.txt
 pip install pytest-runner
@@ -113,6 +114,7 @@ pip install mmcv -i http://mirrors.tencentyun.com/pypi/simple --trusted-host mir
 pip install numba==0.48.0
 pip install cachetools
 pip install ffmpeg-python
+pip install transformers
 
 # tensorflow 1.15 - solve problem - https://stackoverflow.com/questions/58479556/notimplementederror-cannot-convert-a-symbolic-tensor-2nd-target0-to-a-numpy
 # pip config set global.index-url https://mirrors.tencent.com/pypi/simple/

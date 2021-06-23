@@ -32,8 +32,9 @@ https://github.com/tensorflow/models/blob/master/research/slim/nets/vgg.py
 
 import tensorflow as tf
 import vggish_params as params
+import tf_slim
 
-slim = tf.contrib.slim
+slim = tf_slim
 
 
 def define_vggish_slim(training=False):
@@ -64,7 +65,7 @@ def define_vggish_slim(training=False):
   # - All convolutions are 3x3 with stride 1 and SAME padding.
   # - All max-pools are 2x2 with stride 2 and SAME padding.
   with slim.arg_scope([slim.conv2d, slim.fully_connected],
-                      weights_initializer=tf.truncated_normal_initializer(
+                      weights_initializer=tf.compat.v1.truncated_normal_initializer(
                           stddev=params.INIT_STDDEV),
                       biases_initializer=tf.zeros_initializer(),
                       activation_fn=tf.nn.relu,
@@ -73,9 +74,9 @@ def define_vggish_slim(training=False):
                       kernel_size=[3, 3], stride=1, padding='SAME'), \
        slim.arg_scope([slim.max_pool2d],
                       kernel_size=[2, 2], stride=2, padding='SAME'), \
-       tf.variable_scope('vggish'):
+       tf.compat.v1.variable_scope('vggish'):
     # Input: a batch of 2-D log-mel-spectrogram patches.
-    features = tf.placeholder(
+    features = tf.compat.v1.placeholder(
         tf.float32, shape=(None, params.NUM_FRAMES, params.NUM_BANDS),
         name='input_features')
     # Reshape to 4-D so that we can convolve a batch with conv2d().
@@ -117,13 +118,13 @@ def load_vggish_slim_checkpoint(session, checkpoint_path):
   # the checkpoint (i.e., all inference-mode VGGish variables).
   with tf.Graph().as_default():
     define_vggish_slim(training=False)
-    vggish_var_names = [v.name for v in tf.global_variables()]
+    vggish_var_names = [v.name for v in tf.compat.v1.global_variables()]
 
   # Get the list of all currently existing variables that match
   # the list of variable names we just computed.
-  vggish_vars = [v for v in tf.global_variables() if v.name in vggish_var_names]
+  vggish_vars = [v for v in tf.compat.v1.global_variables() if v.name in vggish_var_names]
 
   # Use a Saver to restore just the variables selected above.
-  saver = tf.train.Saver(vggish_vars, name='vggish_load_pretrained',
+  saver = tf.compat.v1.train.Saver(vggish_vars, name='vggish_load_pretrained',
                          write_version=1)
   saver.restore(session, checkpoint_path)

@@ -9,12 +9,13 @@ import traceback
 import tqdm
 import random
 
-from src.feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeatureExtractor
-from src.feats_extract.imgfeat_extractor.finetuned_resnet101 import FinetunedResnet101Extractor
+#from src.feats_extract.imgfeat_extractor.youtube8M_extractor import YouTube8MFeatureExtractor
+#from src.feats_extract.imgfeat_extractor.finetuned_resnet101 import FinetunedResnet101Extractor
 from src.feats_extract.txt_extractor.text_requests import VideoASR,VideoOCR,ImageOCR
 from src.feats_extract.audio_extractor import vggish_input,vggish_params,vggish_postprocess,vggish_slim
-from src.dataloader.preprocess.cnn_preprocessing import inception_preprocessing
+#from src.dataloader.preprocess.cnn_preprocessing import inception_preprocessing
 import utils.utils as utils
+from src.feats_extract.imgfeat_extractor.vit_extractor import VitExtractor
 
 BASE = "/home/tione/notebook/VideoStructuring/MultiModal-Tagging/"
 PCA_PARAMS_PATH = BASE + "pretrained/vggfish/vggish_pca_params.npz"
@@ -27,10 +28,12 @@ N = 100
 
 class MultiModalFeatureExtract(object):
 
+    '''
     def get_video_extractors(self, batch_size):
         return [
                 YouTube8MFeatureExtractor(use_batch=batch_size != 1, device='cuda:0'),
                 ]
+    '''
 
     """docstring for ClassName"""
     def __init__(self, batch_size = 1,
@@ -51,17 +54,17 @@ class MultiModalFeatureExtract(object):
 
         #视频特征抽取模型
         if extract_video:
-            self.video_extractors = self.get_video_extractors(batch_size)
+            self.video_extractor = VitExtractor()
 
         #音频特征抽取模型
         if extract_audio:
             self.pproc = vggish_postprocess.Postprocessor(PCA_PARAMS_PATH)  # audio pca
             self.audio_graph = tf.Graph()
-            config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
+            config = tf.compat.v1.ConfigProto(allow_soft_placement=True, log_device_placement=True)
             if use_gpu:
                 config.gpu_options.allow_growth = True
             with self.audio_graph.as_default():
-                self.audio_sess = tf.Session(graph=self.audio_graph, config=config)
+                self.audio_sess = tf.compat.v1.Session(graph=self.audio_graph, config=config)
                 vggish_slim.define_vggish_slim(training=False)
                 vggish_slim.load_vggish_slim_checkpoint(self.audio_sess, VGGISH_CHECKPOINT_PATH)
             self.features_tensor = self.audio_sess.graph.get_tensor_by_name(vggish_params.INPUT_TENSOR_NAME)
@@ -112,7 +115,7 @@ class MultiModalFeatureExtract(object):
             else:
                 cap = cv2.VideoCapture(video_file)
                 for r_index, r_frame, r_time, count in self.gen_img_batch(cap, frames, self.batch_size, 'extract video feat {}'.format(video_file)):
-                    feat_dict['video'].extend(self.video_extractors[0].extract_rgb_frame_features_list(r_frame, count))
+                    feat_dict['video'].extend(self.video_extractor.extract_rgb_frame_features_list(r_frame, count))
                 cap.release()
                 if save:
                     np.save(video_npy_path, feat_dict['video'])
@@ -267,6 +270,7 @@ class MultiModalFeatureExtract(object):
             ts = cap.get(cv2.CAP_PROP_POS_MSEC)
             if index in frames:
                 r_index.append(index)
+                frame = frame[:,:,::-1].transpose((2,0,1))
                 r_frame.append(frame)
                 r_time.append(ts)
                 progress_bar.update(1)
