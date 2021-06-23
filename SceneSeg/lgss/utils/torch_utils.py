@@ -20,16 +20,17 @@ def to_torch(ndarray):
                          .format(type(ndarray)))
     return ndarray
 
-def save_checkpoint(state, is_best, fpath='checkpoint.pth.tar'):
-    os.makedirs(osp.dirname(fpath),exist_ok=True)
+def save_checkpoint(state, is_best, epoch, save_path):
+    os.makedirs(save_path, exist_ok=True)
+    fpath = '{}/{}.pth.tar'.format(save_path, epoch)
     torch.save(state, fpath)
     if is_best:
-        shutil.copy(fpath, osp.join(osp.dirname(fpath), 'model_best.pth.tar'))
+        shutil.copy(fpath, osp.join(save_path, 'model_best.pth.tar'))
 
 def load_checkpoint(fpath, use_gpu=1):
     if osp.isfile(fpath):
         if use_gpu == 1:
-            checkpoint = torch.load(fpath)
+            checkpoint = torch.load(fpath, map_location="cuda:0")
         else:
             checkpoint = torch.load(fpath, map_location='cpu')
         print("=> Loaded checkpoint '{}'".format(fpath))

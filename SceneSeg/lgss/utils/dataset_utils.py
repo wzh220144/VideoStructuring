@@ -106,6 +106,7 @@ def scene2video(cfg, scene_list, video_name):
     if t < last_frame:
         scene_list.append([t, last_frame])
     mkdir_ifmiss(out_video_dir_fn)
+    #fs = open('{}/{}.info'.format(out_video_dir_fn, video_name))
     for scene_ind, scene_item in enumerate(scene_list):
         scene = str(scene_ind).zfill(4)
         start_frame = int(scene_item[0])
@@ -137,4 +138,6 @@ def scene2video(cfg, scene_list, video_name):
             source_movie_fn]
         call_list += ['-map_chapters', '-1']
         call_list += [out_video_fn]
+        #fs.write(' '.join(call_list) + '\n')
         subprocess.call(call_list)
+    #fs.close()
