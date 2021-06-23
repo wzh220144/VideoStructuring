@@ -17,11 +17,11 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--files_dir', default='/home/tione/notebook/dataset/split/test_5k_A', type=str)
+    parser.add_argument('--files_dir', default='/home/tione/notebook/dataset/split/train_5k_A', type=str)
     parser.add_argument('--postfix', default='mp4', type=str)
     parser.add_argument('--datafile_path', default='dataset/datafile.txt')
     parser.add_argument('--image_batch_size', default=32, type=int)
-    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/split_feats/test_5k_A')
+    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/split_feats/train_5k_A')
     parser.add_argument('--extract_video', type=bool, default=True)
     parser.add_argument('--extract_img', type=bool, default=True)
     parser.add_argument('--extract_audio', type=bool, default=True)
