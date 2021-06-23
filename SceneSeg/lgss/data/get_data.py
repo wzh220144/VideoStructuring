@@ -123,10 +123,7 @@ class Preprocessor(data.Dataset):
                 else:
                     name = 'shot_{}.npy'.format(strcal(shotid, ind))
                 path = osp.join(self.data_root, 'place_feat/{}'.format(imdbid), name)
-                if os.path.exists(path):
-                    place_feat = np.load(path)
-                else:
-                    place_feat = np.zeros()
+                place_feat = np.load(path)
                 place_feats.append(torch.from_numpy(place_feat).float())
         if 'cast' in self.mode:
             for ind in self.shot_boundary_range:
