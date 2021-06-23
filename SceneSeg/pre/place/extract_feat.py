@@ -249,9 +249,10 @@ class ResNet50(torch.nn.Module):
         return feature, x
 
 class Extractor(object):
-    def __init__(self, model):
+    def __init__(self, model, args):
         super(Extractor, self).__init__()
         self.model = model
+        self.use_gpu = args.use_gpu
         # pprint(self.model.module)
 
     def extract_feature(self, data_loader, print_summary=True):
@@ -264,7 +265,8 @@ class Extractor(object):
 
         end = time.time()
         for i, (imgs, fnames) in enumerate(data_loader):
-            imgs = imgs.cuda()
+            if self.use_gpu == 1:
+                imgs = imgs.cuda()
             data_time.update(time.time() - end)
             outputs = self.model(imgs)
 
@@ -422,11 +424,11 @@ def main(args):
     cudnn.benchmark = True
     # create model
     model = ResNet50(pretrained=True)
-    model = torch.nn.DataParallel(model)
     if args.use_gpu == 1:
+        model = torch.nn.DataParallel(model)
         model = model.cuda()
     # create and extractor
-    extractor = Extractor(model)
+    extractor = Extractor(model, args)
     
     if args.list_file is None:
         video_list = sorted(os.listdir(args.source_img_path))
@@ -450,7 +452,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Place feature using ResNet50 with ImageNet pretrain")
-    parser.add_argument('--use_gpu', type=int, default=1)
+    parser.add_argument('--use_gpu', type=int, default=0)
     parser.add_argument('--max_worker', type=int, default=5)
     parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/train_5k_A/shot_hsv")
     parser.add_argument('--save-one-frame-feat', type=bool, default=True)

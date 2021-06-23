@@ -8,19 +8,26 @@ from lgss.data.get_data import get_inference_data
 from torch.utils.data import DataLoader
 import lgss.utils
 from lgss.utils import (load_checkpoint, scene2video)
-from utilis.package import *
+from utils.package import *
 import glob
 from concurrent.futures import ThreadPoolExecutor
 import json
 import lgss.models.lgss_util as lgss_util
+import lgss.models.lgss as lgss
 
 final_dict = {}
 
-def load_model(cfg, args):
-    model = models.__dict__[cfg.model.name](cfg).cuda()
-    model = nn.DataParallel(model)
-    checkpoint = load_checkpoint(cfg.model_path, args.use_gpu)
-    model.load_state_dict(checkpoint['state_dict'])
+def load_model(cfg, args, use_best = True):
+    model = lgss.LGSS(cfg)
+    if args.use_gpu == 1:
+        model = model.cuda()
+    if use_best:
+        checkpoint = load_checkpoint(cfg.model_path + '/model_best.pth.tar', args.use_gpu)
+    else:
+        checkpoint = load_checkpoint(cfg.model_path + '/checkpoint.pth.tar', args.use_gpu)
+    model.load_state_dict(checkpoint['state_dict'], strict=False)
+    if args.use_gpu == 1:
+        model = nn.DataParallel(model)
     return model
 
 def main(cfg, args, video_name, value):
@@ -46,10 +53,10 @@ def main(cfg, args, video_name, value):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
-    parser.add_argument('--config', help='config file path', default = '/home/tione/notebook/VideoStructuring/SceneSeg/config/inference_hsv.py')
-    parser.add_argument('--max_workers', type=int, default = 20)
+    parser.add_argument('--config', help='config file path', default = '/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/inference_hsv.py')
+    parser.add_argument('--max_workers', type=int, default = 1)
     parser.add_argument('--use_gpu', type=int, default = 1)
-    parser.add_argument('--threshold', type=float, default=0.65)
+    parser.add_argument('--threshold', type=float, default=0.93)
     args = parser.parse_args()
     return args
 
@@ -61,7 +68,6 @@ if __name__ == '__main__':
 
     model = load_model(cfg, args)
     print('model complete')
-    print(args.video_dir)
 
     video_names = []
     video_inference_res = {}

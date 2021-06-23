@@ -8,10 +8,12 @@ def get_data(cfg, video_names):
     data_root = cfg.data_root
     res = []
     for video_name in video_names:
-        img_dir_fn = osp.join(data_root, 'shot_keyf', video_name)
-        files = os.listdir(img_dir_fn)
-        shot_ids = sorted([int(x.split(".jpg")[0].split("_")[1]) for x in files if x.split(".jpg")[0][-1] == "1"])
-        end_shot = shotid_ids[-1]
+        shot_ids = []
+        with open(osp.join(data_root, 'shot_txt', video_name + '.txt'), 'r') as f:
+            cur_shot_id = 0
+            for line in f:
+                shot_ids.append(cur_shot_id)
+        end_shot = shot_ids[-1]
         if len(shot_ids) <= cfg.seq_len - 1:
             one_idxs = []
             for _ in range((cfg.seq_len - len(shot_ids)) // 2):

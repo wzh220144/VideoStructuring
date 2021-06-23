@@ -133,17 +133,17 @@ def test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, ep
             cur_max_f1 = f1_w
             cur_max_threshold = threshold
         if ap > best_ap:
+            is_best = True
             best_ap = ap
         if ap > cur_max_ap:
-            is_best = True
             cur_max_ap = ap
     print(
         'epoch {}: \tcur_max_threshold:{:.6f}, best_threshold: {:.6f}, cur_max_f1: {:.6f}, best_f1: {:.6f}, cur_max_ap: {:.6f}, best_ap: {:.6f}'.format(
             epoch, cur_max_threshold, best_threshold,
             cur_max_f1, best_f1, cur_max_ap, best_ap))
 
-    save_checkpoint({'state_dict': model.state_dict(), 'epoch': epoch + 1, },
-                    is_best=is_best, fpath=osp.join(cfg.model_path, 'checkpoint.pth.tar'))
+    state_dict = model.module.state_dict()
+    save_checkpoint({'state_dict': state_dict, 'epoch': epoch + 1}, is_best, epoch + 1, cfg.model_path)
     return best_f1, best_ap, best_threshold
 
 def main():
@@ -177,8 +177,8 @@ def main():
     best_ap = 0
     best_threshold = 0
     for epoch in range(1, cfg.epochs + 1):
-        best_f1, best_ap, best_f1_threshold = test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch)
-        best_f1, best_ap, best_f1_threshold = train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap, best_threshold)
+        best_f1, best_ap, best_threshold = test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch)
+        best_f1, best_ap, best_threshold = train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap, best_threshold)
 
 if __name__ == '__main__':
     main()
