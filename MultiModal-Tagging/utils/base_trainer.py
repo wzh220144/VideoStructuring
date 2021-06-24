@@ -80,6 +80,7 @@ class Trainer(object):
         gpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('GPU')][:self.optimizer_config.num_gpu]
         #cpu_devices = [x.name for x in device_lib.list_local_devices() if 'CPU' in x.device_type]
         cpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('CPU')]
+        #print(cpu_devices)
         num_gpus = len(gpus)
         if num_gpus > 0:
             logging.info("Using the following GPUs to train: " + str(gpus))

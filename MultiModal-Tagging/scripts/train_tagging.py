@@ -132,10 +132,14 @@ class TaggingTrainer(Trainer):
             self.evl_metrics[index].clear()
         self.summary_writer.add_summary(fetch_dict_eval['val_summary_op'], global_step_val)
 
-        return epoch_info_dict['gap'] + np.mean(epoch_info_dict['aps']) #融合特征的预测结果
+        #return epoch_info_dict['gap'] + np.mean(epoch_info_dict['aps']) #融合特征的预测结果
+        return np.mean(epoch_info_dict['aps']) #融合特征的预测结果
 
 
 if __name__ == "__main__":
+    for x in tf.config.experimental.list_physical_devices('GPU'):
+        tf2.config.experimental.set_memory_growth(x, True)
+
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--config',default='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/configs/config.structuring.5k.yaml',type=str)
