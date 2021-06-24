@@ -8,9 +8,10 @@ sys.path.append("/home/tione/notebook/VideoStructuring/MultiModal-Tagging")
 import time
 import numpy as np
 
-import tensorflow as tf
-from tensorflow import logging
-import tensorflow.contrib.slim as slim
+import tensorflow.compat.v1 as tf
+import tensorflow as tf2
+import tensorflow.compat.v1.logging as logging
+import tf_slim as slim
 import src.loss as loss_lib
 import utils.train_util as train_util
 from utils.base_trainer import Trainer, ParameterServer, train_main
@@ -137,9 +138,10 @@ class TaggingTrainer(Trainer):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config',default='configs/config.example.yaml',type=str)
+    parser.add_argument('--config',default='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/configs/config.structuring.5k.yaml',type=str)
     parser.add_argument('--use_gpu',default=1,type=int)
     args = parser.parse_args()
+    tf.disable_eager_execution()
     if args.use_gpu == 1:
         os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     train_main(args.config, TaggingTrainer)

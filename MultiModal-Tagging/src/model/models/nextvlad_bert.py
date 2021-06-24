@@ -1,8 +1,9 @@
 #coding=utf-8
 #Author: jefxiong@tencent.com
 
-import tensorflow as tf
-import tensorflow.contrib.slim as slim
+import tensorflow.compat.v1 as tf
+import tensorflow as tf2
+import tf_slim as slim
 import src.model.video_head as video_head
 import src.model.text_head as text_head
 import src.model.image_head as image_head

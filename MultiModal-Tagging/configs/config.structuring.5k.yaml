@@ -8,7 +8,7 @@ ModelConfig:
   modal_drop_rate: 0.3
   with_video_head: True #视频特征
   with_audio_head: True #音频特征
-  with_text_head: False  #文本特征
+  with_text_head: True  #文本特征
   with_image_head: True #图片特征
 
   #视频特征(16384)
@@ -17,7 +17,7 @@ ModelConfig:
     nextvlad_cluster_size: 128
     groups: 16
     expansion: 2
-    feature_size: 1024 #inception feature dim
+    feature_size: 768
     max_frames: 300
 
   #语音特征(1024)
@@ -94,7 +94,7 @@ OptimizerConfig:
   pretrained_model:
     text_pretrained_model: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/bert/chinese_L-12_H-768_A-12/bert_model.ckpt'
     image_pretrained_model: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/resnet_v2_50/resnet_v2_50.ckpt'
-  train_dir: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/checkpoints/structuring_train5k' #训练模型保存目录,按需修改
+  train_dir: '/home/tione/notebook/VideoStructuring/dataset/model/tag' #训练模型保存目录,按需修改
 
 #############################################################
 #    3. DataSet Config
@@ -104,23 +104,23 @@ DatasetConfig:
   shuffle: True
   train_data_source_list:
     train1:
-      file: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/train.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/train.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
     train2:
-      file: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/train.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/train.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
 
 
   valid_data_source_list:
     val1:
-      file: '/home/tione/notebook/dataset/structuring/GroundTruth/datafile/val.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/val.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
 
   preprocess_root: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/src/dataloader/preprocess/'
   preprocess_config:
     feature:
       - name: 'video,video_frames_num,idx'
-        shape: [[300,1024], [],[]]
+        shape: [[300,768], [],[]]
         dtype: 'float32,int32,string'
         class: 'frames_npy_preprocess.Preprocess'
         extra_args: 

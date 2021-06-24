@@ -13,7 +13,7 @@
 # limitations under the License.
 """Utilities to export a model for batch prediction."""
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 from tensorflow.python.saved_model import builder as saved_model_builder
 from tensorflow.python.saved_model import signature_constants

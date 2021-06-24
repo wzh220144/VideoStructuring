@@ -1,5 +1,5 @@
-import tensorflow.contrib.slim as slim
-import tensorflow as tf
+import tf_slim as slim
+import tensorflow.compat.v1 as tf
 
 class MoeModel():
   """A softmax over a mixture of logistic models (with L2 regularization)."""

@@ -1,5 +1,5 @@
-import tensorflow.contrib.slim as slim
-import tensorflow as tf
+import tf_slim as slim
+import tensorflow.compat.v1 as tf
 
 class NeXtVLAD():
     def __init__(self, feature_size, max_frames, nextvlad_cluster_size, expansion, groups):

@@ -1,7 +1,7 @@
 import tensorflow as tf
-from tensorflow.contrib.slim.nets import resnet_v2
+from tf_slim.nets import resnet_v2
 import functools
-import tensorflow.contrib.slim as slim
+import tf_slim as slim
 
 #import src.model.image_head.efficientNet.efficientnet_builder as efficientnet_builder
 

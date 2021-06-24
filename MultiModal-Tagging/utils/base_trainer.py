@@ -11,11 +11,11 @@ import os
 import shutil
 import traceback
 
-import tensorflow as tf
-from tensorflow import logging
-from tensorflow import gfile
-from tensorflow.python.client import device_lib
-import tensorflow.contrib.slim as slim
+import tensorflow as tf2
+import tensorflow.compat.v1 as tf
+from tensorflow.compat.v1 import logging
+from tensorflow.compat.v1 import gfile
+import tf_slim as slim
 
 from munch import Munch
 import time
@@ -74,9 +74,12 @@ class Trainer(object):
         self.global_step = tf.Variable(0, trainable=False, name="global_step")
 
         #GPU/CPU设置
-        gpus = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
-        gpu_devices = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
-        cpu_devices = [x.name for x in device_lib.list_local_devices() if 'CPU' in x.device_type]
+        #gpus = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
+        gpus = [x.name for x in tf2.config.experimental.list_logical_devices('GPU')][:self.optimizer_config.num_gpu]
+        #gpu_devices = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
+        gpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('GPU')][:self.optimizer_config.num_gpu]
+        #cpu_devices = [x.name for x in device_lib.list_local_devices() if 'CPU' in x.device_type]
+        cpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('CPU')]
         num_gpus = len(gpus)
         if num_gpus > 0:
             logging.info("Using the following GPUs to train: " + str(gpus))

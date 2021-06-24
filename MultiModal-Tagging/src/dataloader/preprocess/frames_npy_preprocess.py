@@ -1,5 +1,5 @@
 import os
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import numpy as np
 
 def resize_axis(tensor, axis, new_size, fill_value=0):

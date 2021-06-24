@@ -49,14 +49,15 @@ def convert_dataformat(line, out_file_dir, frame_npy_folder, audio_npy_folder, i
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--info_file', default='dataset/info/info.txt',type=str)
-    parser.add_argument('--out_file_dir', default='dataset/datafile', type=str)
-    parser.add_argument('--tag_dict_path', default='dataset/dict/tag-id-deconstruction_b0.txt', type=str)
-    parser.add_argument('--frame_npy_folder', default='dataset/video_npy/Youtube8M/deconstruction', type=str)
-    parser.add_argument('--audio_npy_folder', default='dataset/audio_npy/Vggish/deconstruction', type=str)
-    parser.add_argument('--text_txt_folder', default='dataset/text_txt/deconstruction',type=str) 
-    parser.add_argument('--image_folder', default='dataset/image_jpg/deconstruction', type=str)
+    parser.add_argument('--info_file', default='/home/tione/notebook/dataset/GroundTruth/structuring_tagging_info.txt',type=str)
+    parser.add_argument('--out_file_dir', default='/home/tione/notebook/dataset/sample/tag', type=str)
+    parser.add_argument('--tag_dict_path', default='/home/tione/notebook/dataset/label_id.txt', type=str)
+    parser.add_argument('--frame_npy_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/video_npy', type=str)
+    parser.add_argument('--audio_npy_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/audio_npy', type=str)
+    parser.add_argument('--text_txt_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/text_txt',type=str) 
+    parser.add_argument('--image_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/image_jpg', type=str)
     parser.add_argument('--modal_num', default=4, type=int)
+    parser.add_argument('--ratio', default=0.9, type=float)
     count = 0
     args = parser.parse_args()
     if os.path.exists(args.tag_dict_path):
@@ -74,7 +75,7 @@ if __name__ == '__main__':
         lines = [line for line in f]
         random.shuffle(lines)
 
-        train_nums = 0.9 * len(lines)
+        train_nums = args.ratio * len(lines)
         os.makedirs(args.out_file_dir, exist_ok=True)
         train_file = os.path.join(args.out_file_dir, 'train.txt')
         val_file = os.path.join(args.out_file_dir, 'val.txt')

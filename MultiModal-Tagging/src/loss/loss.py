@@ -1,6 +1,6 @@
 """Provides definitions for non-regularized training or test losses."""
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 
 class BaseLoss(object):
