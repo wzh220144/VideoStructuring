@@ -6,7 +6,7 @@ import glob
 import os
 
 import tensorflow as tf
-from tensorflow import logging
+from tensorflow.compat.v1 import logging
 
 import utils.metrics.mean_average_precision_calculator as map_calculator
 import utils.metrics.average_precision_calculator as ap_calculator
@@ -163,9 +163,11 @@ def combine_gradients(tower_grads):
      across all towers.
   """
   filtered_grads = [[x for x in grad_list if x[0] is not None] for grad_list in tower_grads]
+  filtered_grads = [sorted(x, key=lambda y: y[0].name) for x in filtered_grads]
   final_grads = []
   for i in range(len(filtered_grads[0])):
     grads = [filtered_grads[t][i] for t in range(len(filtered_grads))]
+    #print(filtered_grads[0][i], filtered_grads[1][i])
     grad = tf.stack([x[0] for x in grads], 0)
     grad = tf.reduce_mean(grad, 0)
     final_grads.append((grad, filtered_grads[0][i][1],))

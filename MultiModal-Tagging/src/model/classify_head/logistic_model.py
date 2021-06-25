@@ -1,5 +1,5 @@
-import tensorflow.contrib.slim as slim
-import tensorflow as tf
+import tf_slim as slim
+import tensorflow.compat.v1 as tf
 
 class LogisticModel():
   """Logistic model with L2 regularization."""

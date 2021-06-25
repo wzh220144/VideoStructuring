@@ -1,6 +1,6 @@
 # coding=utf-8
 import yaml
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import os,sys
 sys.path.append(os.getcwd())
 from src.dataloader.data_generator import Data_Generator

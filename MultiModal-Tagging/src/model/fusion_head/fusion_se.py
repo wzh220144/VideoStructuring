@@ -1,5 +1,5 @@
-import tensorflow.contrib.slim as slim
-import tensorflow as tf
+import tf_slim as slim
+import tensorflow.compat.v1 as tf
 
 class SE():
     """Dropout + Channel Attention
@@ -29,7 +29,7 @@ class SE():
         gates = tf.matmul(activation, gating_weights_1)
 
         gates = slim.batch_norm(gates,center=True,scale=True,is_training=is_training,
-                                activation_fn=slim.nn.relu, scope="gating_bn")
+                                activation_fn=tf.nn.relu, scope="gating_bn")
         gating_weights_2 = tf.get_variable("gating_weights_2",
                                            [self.hidden1_size // self.gating_reduction, self.hidden1_size],
                                            initializer=slim.variance_scaling_initializer()

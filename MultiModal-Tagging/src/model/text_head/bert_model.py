@@ -1,4 +1,4 @@
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from src.model.text_head.bert_base import BertModel,BertConfig
 
 class BERT():
