@@ -29,8 +29,6 @@ def get_shots_from_cuts(cut_list, base_timecode):
 
 def main(args, video_path, data_root):
     video_id = video_path.split('/')[-1].split(".mp4")[0]
-    if video_id != '9771be7df83130e34e231e294ebf67b9':
-        return
 
     #print("...cutting shots for ", video_path)
     video_path = osp.abspath(video_path)

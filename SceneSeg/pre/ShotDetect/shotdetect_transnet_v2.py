@@ -226,8 +226,8 @@ if __name__ == '__main__':
             model = models[t]
             print("...cutting shots for ", video_path)
             video_id = video_path.split('/')[-1].split(".mp4")[0]
-            if video_id != 'c9cc5b0ef4730e519296e7af9f369a8c':
-                continue
+            #if video_id != '156c6f3712044ddf02408ad49c4fb9b8':
+            #    continue
             results.append(executor.submit(main, device, model, args, video_path, args.save_dir))
         results = [res.result() for res in results]
      
