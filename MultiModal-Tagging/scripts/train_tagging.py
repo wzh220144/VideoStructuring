@@ -16,6 +16,10 @@ import src.loss as loss_lib
 import utils.train_util as train_util
 from utils.base_trainer import Trainer, ParameterServer, train_main
 
+logger = logging.getLogger('tensorflow')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+for h in logger.handlers:
+    h.setFormatter(formatter)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 class TaggingTrainer(Trainer):
@@ -69,7 +73,7 @@ class TaggingTrainer(Trainer):
         #hit_at_one = train_util.calculate_hit_at_one(predictions_val, labels_val)
         #perr = train_util.calculate_precision_at_equal_recall_rate(predictions_val, labels_val)
         gap = train_util.calculate_gap(predictions_val, labels_val)
-        print(predictions_val.shape, labels_val.shape)
+        #print(predictions_val.shape, labels_val.shape)
         train_pr_calculator.accumulate(predictions_val, labels_val)
         precision_at_1 = train_pr_calculator.get_precision_at_conf(0.1)
         precision_at_5 = train_pr_calculator.get_precision_at_conf(0.5)
@@ -137,8 +141,8 @@ class TaggingTrainer(Trainer):
 
 
 if __name__ == "__main__":
-    for x in tf.config.experimental.list_physical_devices('GPU'):
-        tf2.config.experimental.set_memory_growth(x, True)
+    #for x in tf.config.experimental.list_physical_devices('GPU'):
+    #    tf2.config.experimental.set_memory_growth(x, True)
 
     import argparse
     parser = argparse.ArgumentParser()

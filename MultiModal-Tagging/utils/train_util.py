@@ -5,7 +5,8 @@ import re
 import glob
 import os
 
-import tensorflow as tf
+import tensorflow as tf2
+import tensorflow.compat.v1 as tf
 from tensorflow.compat.v1 import logging
 
 import utils.metrics.mean_average_precision_calculator as map_calculator

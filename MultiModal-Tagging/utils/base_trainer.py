@@ -81,7 +81,7 @@ class Trainer(object):
         #cpu_devices = [x.name for x in device_lib.list_local_devices() if 'CPU' in x.device_type]
         cpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('CPU')]
         #print(cpu_devices)
-        num_gpus = len(gpus)
+        num_gpus = len(gpu_devices)
         if num_gpus > 0:
             logging.info("Using the following GPUs to train: " + str(gpus))
             num_towers = num_gpus
@@ -128,7 +128,7 @@ class Trainer(object):
                 device = cpu_devices[i]
             with tf.device(device):
                 with (tf.variable_scope(("tower"), reuse=True if i > 0 else None)):
-                    with (slim.arg_scope([slim.model_variable, slim.variable], device=cpu_devices[0])):
+                    with (slim.arg_scope([slim.model_variable, slim.variable], device=gpu_devices[0])):
                         result_dict = self.model(tower_inputs[i],train_batch_size = self.reader.batch_size//num_towers, is_training=True)
     
                         #遍历所有分类任务输出
@@ -292,6 +292,8 @@ class Trainer(object):
                         batch_start_time = time.time()
                         train_fetch_dict_eval = sess.run(self.train_fetch_dict)
                         global_step_val = train_fetch_dict_eval['global_step']
+                        print('global step: {}'.format(global_step_val))
+                        #print(train_fetch_dict_eval)
                         train_losses_dict = train_fetch_dict_eval['train_losses_dict']
                         if global_step_val>total_iteration:
                             logging.info("step limit reached")
@@ -401,7 +403,7 @@ class Trainer(object):
 #训练流程
 def train_main(config_path, TrainerType):
     config = yaml.load(open(config_path))
-    print(config)
+    #print(config)
 
     env = json.loads(os.environ.get("TF_CONFIG", "{}"))
     cluster_data = env.get("cluster", None)

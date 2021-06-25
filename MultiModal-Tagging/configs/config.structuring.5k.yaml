@@ -88,8 +88,8 @@ OptimizerConfig:
   export_model_steps: 1000
   learning_rate_decay: 0.5
   start_new_model: True # 如果为True，重新训练； 如果False，则resume
-  num_gpu: 2
-  log_device_placement: True
+  num_gpu: 1
+  log_device_placement: False
   gpu_allow_growth: True
   pretrained_model:
     text_pretrained_model: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/bert/chinese_L-12_H-768_A-12/bert_model.ckpt'
