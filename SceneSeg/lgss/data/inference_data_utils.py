@@ -6,32 +6,27 @@ def get_data(cfg, video_names):
     assert (cfg.seq_len % 2 == 0)
     seq_len_half = cfg.seq_len // 2
     data_root = cfg.data_root
-    res = []
+    one_mode_idxs = []
     for video_name in video_names:
-        shot_ids = []
+        shotid_list = []
         with open(osp.join(data_root, 'shot_txt', video_name + '.txt'), 'r') as f:
             cur_shot_id = 0
             for line in f:
-                shot_ids.append(cur_shot_id)
-        end_shot = shot_ids[-1]
-        if len(shot_ids) <= cfg.seq_len:
-            one_idxs = []
-            for _ in range((cfg.seq_len - len(shot_ids)) // 2):
-                print(video_name, strcal(0, 0))
-                one_idxs.append({'imdbid': video_name, 'shotid': strcal(0, 0), 'endshot': end_shot})
-            for i in range(len(shot_ids)):
-                print(video_name, strcal(i, 0))
-                one_idxs.append({'imdbid': video_name, 'shotid': strcal(i, 0), 'endshot': end_shot})
-            remain = cfg.seq_len - len(one_idxs)
-            for _ in range(remain):
-                print(video_name, strcal(len(shot_ids) - 1, 0))
-                one_idxs.append({'imdbid': video_name, 'shotid': strcal(len(shot_ids) - 1, 0), 'endshot': end_shot})
-            res.append(one_idxs)
-        else:
-            for i in range(seq_len_half - 1, len(shot_ids) - seq_len_half):
+                shotid_list.append(cur_shot_id)
+                cur_shot_id += 1
+        if len(shotid_list) <= 1:
+            continue
+        shotid_list = shotid_list[:-1]
+        end_shot = shotid_list[-1]
+
+        if len(shotid_list) % cfg.seq_len > 0:
+            new_len = (len(shotid_list) // cfg.seq_len + 1) * cfg.seq_len
+            padding_left = (new_len - len(shotid_list)) // 2
+            padding_right = new_len - len(shotid_list) - padding_left
+            shotid_list = [shotid_list[0]] * padding_left + shotid_list + [shotid_list[-1]] * padding_right
+        for i in range(len(shotid_list) // cfg.seq_len):
                 one_idxs = []
-                for idx in range(-seq_len_half + 1, seq_len_half + 1):
-                    print(video_name, strcal(i, idx))
-                    one_idxs.append({'imdbid': video_name, 'shotid': strcal(i, idx), 'endshot': end_shot})
-                res.append(one_idxs)
-    return res
+                for j in range(cfg.seq_len):
+                    one_idxs.append({'imdbid': video_name, 'shotid': strcal(cfg.seq_len * i, j), "endshot":  strcal(end_shot, 0)})
+                one_mode_idxs.append(one_idxs)
+    return one_mode_idxs
