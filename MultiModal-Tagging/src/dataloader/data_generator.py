@@ -198,7 +198,7 @@ class Data_Generator:
                    for preprocess_data_element in preprocess_data:
                        preprocess_data_list.append(preprocess_data_element)
                 end = time.time()
-                print(len(args), index, self.index_preprocess_module[index], end - begin, data, preprocess_data)
+                #print(len(args), index, self.index_preprocess_module[index], end - begin, data, preprocess_data)
             return tuple(preprocess_data_list)
 
         return preprocess_fn
@@ -225,7 +225,7 @@ if __name__ == '__main__':
            end_time = time.time()
            time_list_sum += (end_time-start_time)
            time_count += 1
-           print(time_count,np.mean(time_list_sum)/time_count)
+           #print(time_count,np.mean(time_list_sum)/time_count)
            for x,output_name in zip(sample,data_generator.dname_string_list):
                print(x, output_name)
 

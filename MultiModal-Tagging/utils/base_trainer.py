@@ -13,7 +13,8 @@ import traceback
 
 import tensorflow as tf2
 import tensorflow.compat.v1 as tf
-from tensorflow.compat.v1 import logging
+import tensorflow.compat.v1.logging as tf_logging
+import logging
 from tensorflow.compat.v1 import gfile
 import tf_slim as slim
 
@@ -26,6 +27,7 @@ import utils.train_util as train_util
 import src.loss as loss_lib
 from utils.train_util import ParameterServer,task_as_string,start_server
 from utils.export_model import ModelExporter
+import pysnooper
 
 class Trainer(object):
     def __init__(self, cluster, task, model, reader, configs):
@@ -292,10 +294,10 @@ class Trainer(object):
                         batch_start_time = time.time()
                         train_fetch_dict_eval = sess.run(self.train_fetch_dict)
                         global_step_val = train_fetch_dict_eval['global_step']
-                        print('global step: {}'.format(global_step_val))
+                        print('fuck global step: {}'.format(global_step_val))
                         #print(train_fetch_dict_eval)
                         train_losses_dict = train_fetch_dict_eval['train_losses_dict']
-                        if global_step_val>total_iteration:
+                        if global_step_val > total_iteration:
                             logging.info("step limit reached")
                             break
 
@@ -401,6 +403,7 @@ class Trainer(object):
         return tf.train.import_meta_graph(meta_filename)
 
 #训练流程
+@pysnooper.snoop(output='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/snooper_log', depth=5, max_variable_length=None, thread_info=True)
 def train_main(config_path, TrainerType):
     config = yaml.load(open(config_path))
     #print(config)
@@ -412,7 +415,7 @@ def train_main(config_path, TrainerType):
     task = type("TaskSpec", (object,), task_data)
 
     # Logging the version.
-    logging.set_verbosity(tf.logging.INFO)
+    tf_logging.set_verbosity(tf_logging.INFO)
     logging.info("%s: Tensorflow version: %s.",task_as_string(task), tf.__version__)
 
     # Dispatch to a master, a worker, or a parameter server.

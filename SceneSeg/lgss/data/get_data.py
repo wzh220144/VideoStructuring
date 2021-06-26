@@ -142,10 +142,13 @@ class Preprocessor(data.Dataset):
                     name = 'shot_{}.npy'.format(str(end_shot).zfill(4))
                 else:
                     name = 'shot_{}.npy'.format(strcal(shotid, ind))
-                path = osp.join(
-                    self.data_root, 'aud_feat/{}'.format(imdbid), name)
-                aud_feat = np.load(path)
-                aud_feats.append(torch.from_numpy(aud_feat).float())
+                try:
+                    path = osp.join(
+                        self.data_root, 'aud_feat/{}'.format(imdbid), name)
+                    aud_feat = np.load(path)
+                    aud_feats.append(torch.from_numpy(aud_feat).float())
+                except Exception as e:
+                    print('{}:{}'.format(path, e))
 
         if len(place_feats) > 0:
             place_feats = torch.stack(place_feats)
