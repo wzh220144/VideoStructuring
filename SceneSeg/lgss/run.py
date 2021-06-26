@@ -140,7 +140,7 @@ def test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, ep
             cur_max_f1, best_f1, cur_max_ap, best_ap))
 
     state_dict = model.module.state_dict()
-    save_checkpoint({'state_dict': state_dict, 'epoch': epoch + 1}, is_best, epoch + 1, cfg.model_path)
+    save_checkpoint({'state_dict': state_dict, 'epoch': epoch + 1, 'f1': cur_max_f1, 'threshold': cur_max_threshold, 'ap': ap}, is_best, epoch + 1, cfg.model_path)
     return best_f1, best_ap, best_threshold
 
 def main():

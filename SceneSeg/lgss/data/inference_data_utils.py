@@ -13,6 +13,7 @@ def get_data(cfg, video_names):
             cur_shot_id = 0
             for line in f:
                 shotid_list.append(cur_shot_id)
+                cur_shot_id += 1
         if len(shotid_list) <= 1:
             continue
         shotid_list = shotid_list[:-1]
