@@ -37,7 +37,9 @@ def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, dat
     video_ids = t
     other = []
     for i in range(len(labels)):
+        print(labels[i], probs[i], end_frames[i], video_ids[i])
         other.append((labels[i], probs[i], end_frames[i], video_ids[i]))
+    print('')
     return other, total_loss
 
 def inference(cfg, args, model, data_loader, criterion):
@@ -47,7 +49,7 @@ def inference(cfg, args, model, data_loader, criterion):
     with torch.no_grad():
         for data_place, data_cast, data_act, data_aud, target, end_frames, video_ids in tqdm.tqdm(data_loader,
                                                                                                   total=len(
-                                                                                                          data_loader)):
+                                                                                                          data_loader), desc='inference'):
             t, loss = _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target,
                                  end_frames, video_ids)
             res.extend(t)
@@ -81,7 +83,7 @@ def val(cfg, res, threshold, total_loss, args, fps_dict):
             predict = 1
         if predict == 1:
             video_predicts[video_id].append(ts)
-    video_predicts = {k: sorted(v) for k, v in video_predicts.items()}
+    video_predicts = {k: sorted(list(set(v))) for k, v in video_predicts.items()}
 
     video_true = {}
     annotation_dict = {}
@@ -120,5 +122,5 @@ def val(cfg, res, threshold, total_loss, args, fps_dict):
     f1_w = 0
     if t1 + t2 > 0:
         f1_w = 2 * t1 * t2 / (t1 + t2)
-    #print(tp, pt, rt)
+    print(tp, pt, rt)
     return auc, acc, recall, precision, ap, f1, avg_loss, f1_w

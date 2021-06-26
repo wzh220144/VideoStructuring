@@ -36,12 +36,12 @@ train_iter = 0
 
 def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, criterion, best_f1, best_ap, best_threshold):
     global train_iter
-    model.train()
     labels = []
     preds = []
     probs = []
     total_loss = 0.0
     cnt = 0
+    model.train()
     for batch_idx, (data_place, data_cast, data_act, data_aud, target, end_frames, video_ids) in enumerate(train_loader):
         #print(data_place, data_cast, data_act, data_aud, target, end_frames, video_ids)
         data_place = data_place.cuda() if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
@@ -104,9 +104,6 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
             probs = []
             total_loss = 0
             cnt = 0
-
-        if batch_idx % 1000 == 0 and batch_idx != 0:
-            best_f1, best_ap, best_threshold = test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch)
 
     scheduler.step()
     return best_f1, best_ap, best_threshold

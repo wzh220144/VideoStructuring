@@ -14,20 +14,24 @@ def get_data(cfg, video_names):
             for line in f:
                 shot_ids.append(cur_shot_id)
         end_shot = shot_ids[-1]
-        if len(shot_ids) <= cfg.seq_len - 1:
+        if len(shot_ids) <= cfg.seq_len:
             one_idxs = []
             for _ in range((cfg.seq_len - len(shot_ids)) // 2):
+                print(video_name, strcal(0, 0))
                 one_idxs.append({'imdbid': video_name, 'shotid': strcal(0, 0), 'endshot': end_shot})
             for i in range(len(shot_ids)):
+                print(video_name, strcal(i, 0))
                 one_idxs.append({'imdbid': video_name, 'shotid': strcal(i, 0), 'endshot': end_shot})
             remain = cfg.seq_len - len(one_idxs)
             for _ in range(remain):
+                print(video_name, strcal(len(shot_ids) - 1, 0))
                 one_idxs.append({'imdbid': video_name, 'shotid': strcal(len(shot_ids) - 1, 0), 'endshot': end_shot})
             res.append(one_idxs)
         else:
             for i in range(seq_len_half - 1, len(shot_ids) - seq_len_half):
                 one_idxs = []
                 for idx in range(-seq_len_half + 1, seq_len_half + 1):
+                    print(video_name, strcal(i, idx))
                     one_idxs.append({'imdbid': video_name, 'shotid': strcal(i, idx), 'endshot': end_shot})
                 res.append(one_idxs)
     return res

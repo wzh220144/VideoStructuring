@@ -25,6 +25,7 @@ def load_model(cfg, args, use_best = True):
         checkpoint = load_checkpoint(cfg.model_path + '/model_best.pth.tar', args.use_gpu)
     else:
         checkpoint = load_checkpoint(cfg.model_path + '/checkpoint.pth.tar', args.use_gpu)
+    print(checkpoint)
     model.load_state_dict(checkpoint['state_dict'], strict=False)
     if args.use_gpu == 1:
         model = nn.DataParallel(model)
@@ -54,7 +55,7 @@ def main(cfg, args, video_name, value):
 def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
     parser.add_argument('--config', help='config file path', default = '/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/inference_hsv.py')
-    parser.add_argument('--max_workers', type=int, default = 1)
+    parser.add_argument('--max_workers', type=int, default = 30)
     parser.add_argument('--use_gpu', type=int, default = 1)
     parser.add_argument('--threshold', type=float, default=0.93)
     args = parser.parse_args()
@@ -75,25 +76,28 @@ if __name__ == '__main__':
         video_name = os.path.basename(video_path).split(".m")[0]
         log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
         if osp.exists(log_path):
-            print(log_path + ' exist.')
+            #print(log_path + ' exist.')
             with open(log_path, 'r') as f:
                 video_inference_res[video_name] = json.load(f)
             continue
-        print(log_path + ' does not exist.')
+        #print(log_path + ' does not exist.')
         video_names.append(video_name)
     data = get_inference_data(cfg, video_names)
     data_loader = DataLoader(data, batch_size=cfg.batch_size, shuffle=False, **cfg.data_loader_kwargs)
 
     criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
     inference_res, total_loss = lgss_util.inference(cfg, args, model, data_loader, criterion)
+    print(len(inference_res), total_loss)
     for x in inference_res:
         label = x[0]
         prob = x[1]
         end_frame = x[2]
         video_name = x[3]
+        print(label, prob, end_frame, video_name)
         if video_name not in video_inference_res:
             video_inference_res[video_name] = {}
         video_inference_res[video_name][str(end_frame)] = {'prob': prob.item(), 'label': label}
+    '''
     os.makedirs(os.path.join(cfg.data_root, "seg_results"), exist_ok=True)
     for video_name, value in video_inference_res.items():
         log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
@@ -107,3 +111,4 @@ if __name__ == '__main__':
         for res in results:
             res.result()
     print('done')
+    '''
