@@ -9,7 +9,7 @@ output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/output'
 shot_frm_path = data_root + "/shot_txt"
 shot_num = 6
 seq_len = 4
-gpus = "0"
+gpus = "1"
 
 # dataset settings
 dataset = dict(

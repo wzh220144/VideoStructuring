@@ -25,7 +25,6 @@ def load_model(cfg, args, use_best = True):
         checkpoint = load_checkpoint(cfg.model_path + '/model_best.pth.tar', args.use_gpu)
     else:
         checkpoint = load_checkpoint(cfg.model_path + '/checkpoint.pth.tar', args.use_gpu)
-    print(checkpoint)
     model.load_state_dict(checkpoint['state_dict'], strict=False)
     if args.use_gpu == 1:
         model = nn.DataParallel(model)
@@ -74,6 +73,7 @@ if __name__ == '__main__':
     video_inference_res = {}
     for video_path in glob.glob(os.path.join(cfg.video_dir, '*.mp4')):
         video_name = os.path.basename(video_path).split(".m")[0]
+        video_inference_res[video_name] = {}
         log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
         if osp.exists(log_path):
             #print(log_path + ' exist.')

@@ -37,9 +37,9 @@ def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, dat
     video_ids = t
     other = []
     for i in range(len(labels)):
-        print(labels[i], probs[i], end_frames[i], video_ids[i])
+        #print(labels[i], probs[i], end_frames[i], video_ids[i])
         other.append((labels[i], probs[i], end_frames[i], video_ids[i]))
-    print('')
+    #print('')
     return other, total_loss
 
 def inference(cfg, args, model, data_loader, criterion):
