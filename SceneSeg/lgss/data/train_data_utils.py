@@ -15,14 +15,12 @@ def data_partition(cfg, imdbidlist_json, annos_dict):
         for imdbid in imdbidlist_json[mode]:
             anno_dict = annos_dict[imdbid]
             shotid_list = sorted(anno_dict.keys())
-
+            end_shot = shotid_list[-1]
             if len(shotid_list) % cfg.seq_len:
                 new_len = (len(shotid_list) // cfg.seq_len + 1) * cfg.seq_len
                 padding_left = (new_len - len(shotid_list)) // 2
                 padding_right = new_len - len(shotid_list) - padding_left
                 shotid_list = [shotid_list[0]] * padding_left + shotid_list + [shotid_list[-1]] * padding_right
-            #print(imdbid, shotid_list)
-            end_shot = shotid_list[-1]
             for i in range(len(shotid_list) // cfg.seq_len):
                 one_idxs = []
                 for j in range(cfg.seq_len):

@@ -4,12 +4,11 @@ experiment_description = "scene segmentation using images only"
 # overall confg
 data_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2'
 video_dir = '/home/tione/notebook/dataset/videos/test_5k_2nd'
-model_path = '/home/tione/notebool/dataset/model/seg/shot_transnet_v2'
-output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2_output'
+model_path = '/home/tione/notebook/dataset/model/seg/shot_transnet_v2'
+output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/output'
 shot_frm_path = data_root + "/shot_txt"
-video_name = "test"
-shot_num = 4
-seq_len = 2
+shot_num = 6
+seq_len = 4
 gpus = "0"
 
 # dataset settings
@@ -29,7 +28,7 @@ model = dict(
     bidirectional=True,
     lstm_hidden_size=512,
     ratio=[0.8,0, 0, 0.2],
-    num_layers=1,
+    num_layers=2,
     )
 
 # optimizer
