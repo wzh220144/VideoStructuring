@@ -138,6 +138,7 @@ class Data_Generator:
                 source_batch_size = self.train_data_source_list[source_name]['batch_size']
                 for _ in range(source_batch_size):
                     return_list = self.train_source_generator[source_name].__next__()
+                    #print(return_list)
                     yield return_list
 
     def get_valid_sample_generator_dict(self):
@@ -186,7 +187,7 @@ class Data_Generator:
             self.index_preprocess_module.append(preprocess_module)
         self.index_to_preprocess = index_to_preprocess
         
-        @threads(20)
+        @threads(30)
         def preprocess_fn(*args):
             preprocess_data_list = []
             for index, data in enumerate(args):
