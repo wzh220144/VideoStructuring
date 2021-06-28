@@ -3,4 +3,6 @@ __pycache__
 .idea
 .ipynb_checkpoints
 dataset
+*.log
 log
+pretrained
