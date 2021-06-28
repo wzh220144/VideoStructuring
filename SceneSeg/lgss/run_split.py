@@ -29,9 +29,7 @@ def main(cfg, args, video_name, value, threshold):
         if label == 1:
             scene_list.append([start_frame, end_frame])
             start_frame = end_frame + 1
-    if len(end_frames) > 0 and end_frames[-1] > start_frame:
-        scene_list.append([start_frame, end_frames[-1]])
-    if len(end_frames) == 0:
+    if len(scene_list) == 0:
         print('{}, {}, {}'.format(video_name, value, scene_list))
     scene2video(cfg, scene_list, args, video_name)
 
