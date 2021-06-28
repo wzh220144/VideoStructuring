@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import sklearn
 import sklearn.metrics
 
-def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids):
+def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids):
     total_loss = 0
     data_place = data_place.cuda() if 'place' in cfg.dataset.mode else []
     data_cast = data_cast.cuda() if 'cast' in cfg.dataset.mode else []
@@ -29,16 +29,22 @@ def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, dat
     labels = to_numpy(target).tolist()
     probs = to_numpy(prob)
     end_frames = to_numpy(end_frames.view(-1)).tolist()
-    t = []
+    t1 = []
+    t2 = []
+    t3 = []
     #print(video_ids, labels, probs, end_frames)
     for i in range(len(video_ids[0])):
-        for x in video_ids:
-            t.append(x[i])
-    video_ids = t
+        for j in range(len(video_ids)):
+            t1.append(video_ids[j][i])
+            t2.append(shot_ids[j][i])
+            t3.append(end_shotids[j][i])
+    video_ids = t1
+    shot_ids = t2
+    end_shotids = t3
     other = []
     for i in range(len(labels)):
         #print(labels[i], probs[i], end_frames[i], video_ids[i])
-        other.append((labels[i], probs[i], end_frames[i], video_ids[i]))
+        other.append((labels[i], probs[i], end_frames[i], video_ids[i], shot_ids[i], end_shotids[i]))
     #print('')
     return other, total_loss
 
@@ -47,16 +53,16 @@ def inference(cfg, args, model, data_loader, criterion):
     res = []
     total_loss = 0.0
     with torch.no_grad():
-        for data_place, data_cast, data_act, data_aud, target, end_frames, video_ids in tqdm.tqdm(data_loader,
+        for data_place, data_cast, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids in tqdm.tqdm(data_loader,
                                                                                                   total=len(
                                                                                                           data_loader), desc='inference'):
             t, loss = _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target,
-                                 end_frames, video_ids)
+                                 end_frames, video_ids, shot_ids, end_shotids)
             res.extend(t)
             total_loss += loss
     return res, total_loss
 
-def val(cfg, res, threshold, total_loss, args, fps_dict):
+def val(cfg, res, threshold, total_loss, args, fps_dict, topn = -1, smooth_threshold = 0.1):
     probs = [x[1] for x in res]
     predicts = [1 if x[1] >= threshold else 0 for x in res]
     labels = [x[0] for x in res]
@@ -67,29 +73,54 @@ def val(cfg, res, threshold, total_loss, args, fps_dict):
     ap = sklearn.metrics.average_precision_score(labels, probs)
     f1 = sklearn.metrics.f1_score(labels, predicts, zero_division=1)
     avg_loss = total_loss / len(res)
+    topn = args.topn
+    smooth_threshold = threshold - args.smooth_threshold
 
     video_ids = set([])
     video_predicts = {}
+    video_res = {}
     for x in res:
         video_id = x[3]
+        shot_id = x[4]
+        end_shotid = x[5]
         video_ids.add(video_id)
+        #过滤填充id
+        if shot_id > end_shotid:
+            continue
+        if shot_id < 0:
+            continue
         #print(x[2], video_id, fps_dict[video_id])
         ts = float(x[2]) / fps_dict[video_id]
         prob = x[1]
         if video_id not in video_predicts:
             video_predicts[video_id] = []
+        if video_id not in video_res:
+            video_res[video_id] = []
         predict = 0
         if prob >= threshold:
             predict = 1
         if predict == 1:
             video_predicts[video_id].append(ts)
+        video_res[video_id].append((ts, prob))
     video_predicts = {k: sorted(list(set(v))) for k, v in video_predicts.items()}
+
+    t_dict = {}
+    for k, v in video_predicts.items():
+        if len(v) == 0 and topn > 0:
+            t = sorted(video_res[k], key=lambda x: -x[1])
+            l = len(t)
+            for index in range(topn):
+                if index < l and t[index][1] >= smooth_threshold:
+                    v.append(t[index][0])
+            t_dict[k] = sorted(list(set(v)))
+        else:
+            t_dict[k] = v
 
     video_true = {}
     annotation_dict = {}
     with open(args.annotation_file, 'r') as f:
         annotation_dict = json.load(f)
-
+        
     tp = 0
     pt = 0
     rt = 0

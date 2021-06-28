@@ -91,6 +91,13 @@ if __name__ == '__main__':
         prob = x[1]
         end_frame = x[2]
         video_name = x[3]
+        shot_id = x[4]
+        end_shotid = x[5]
+        #过滤填充id
+        if shot_id > end_shotid:
+            continue
+        if shot_id < 0:
+            continue
         if video_name not in video_inference_res:
             video_inference_res[video_name] = {}
         k = str(end_frame)

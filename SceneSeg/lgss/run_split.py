@@ -17,6 +17,8 @@ import lgss.models.lgss as lgss
 
 final_dict = {}
 
+
+
 def main(cfg, args, video_name, value, threshold):
     end_frames = sorted([int(key) for key in value.keys()])
     start_frame = 0
@@ -29,8 +31,19 @@ def main(cfg, args, video_name, value, threshold):
         if label == 1:
             scene_list.append([start_frame, end_frame])
             start_frame = end_frame + 1
+    topn = args.topn
+    smooth_threshold = threshold - args.smooth_threshold
     if len(scene_list) == 0:
-        print('{}, {}, {}'.format(video_name, value, scene_list))
+        t = sorted([(int(k), v) for k, v in value.items()], key=lambda x: -x[1]['prob'])
+        frames = []
+        for index in range(topn):
+            if index < len(t) and t[index][1]['prob'] >= smooth_threshold:
+                frames.append(t[index][0])
+        start_frame = 0
+        frames = sorted(frames)
+        for frame in frames:
+            scene_list.append([start_frame, frame])
+            start_frame = frame + 1
     scene2video(cfg, scene_list, args, video_name)
 
 def parse_args():
@@ -39,6 +52,8 @@ def parse_args():
     parser.add_argument('--max_workers', type=int, default = 30)
     parser.add_argument('--use_gpu', type=int, default = 1)
     parser.add_argument('--threshold', type=float, default=0.94)
+    parser.add_argument('--topn', type=int, default=-1)
+    parser.add_argument('--smooth_threshold', type=float, default=0.1)
     args = parser.parse_args()
     return args
 

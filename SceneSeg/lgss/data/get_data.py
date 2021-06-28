@@ -65,9 +65,9 @@ class Preprocessor(data.Dataset):
     def __getitem__(self, index):
         ID_list = self.listIDs[index]
         if isinstance(ID_list, (tuple, list)):
-            place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids = [], [], [], [], [], [], []
+            place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids = [], [], [], [], [], [], [], [], []
             for ID in ID_list:
-                place_feat, cast_feat, act_feat, aud_feat, label, end_frame, video_id = self._get_single_item(ID)
+                place_feat, cast_feat, act_feat, aud_feat, label, end_frame, video_id, shot_id, end_shotid = self._get_single_item(ID)
                 place_feats.append(place_feat)
                 cast_feats.append(cast_feat)
                 act_feats.append(act_feat)
@@ -75,6 +75,8 @@ class Preprocessor(data.Dataset):
                 labels.append(label)
                 end_frames.append(end_frame)
                 video_ids.append(video_id)
+                shot_ids.append(shot_id)
+                end_shotids.append(end_shotid)
             if 'place' in self.mode:
                 place_feats = torch.stack(place_feats)
             if 'cast' in self.mode:
@@ -86,7 +88,7 @@ class Preprocessor(data.Dataset):
             labels = np.array(labels)
             end_frames = np.array(end_frames)
             video_ids = video_ids
-            return place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids
+            return place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids
         else:
             return self._get_single_item(ID_list)
         '''
@@ -104,16 +106,27 @@ class Preprocessor(data.Dataset):
             return self._get_single_item(ID_list)
         '''
 
+    # 得到单条样本
     def _get_single_item(self, ID):
+        #得到vid
         imdbid = ID['imdbid']
+        #得到当前主要shotid
         shotid = ID['shotid']
+        #得到该video的最后一个shot
         end_shot = int(ID['endshot'])
+        #得到该video的最后一个frame
         end_frame = self.shot_frames[self.gen_key(imdbid, ID['endshot'])][1]
         if int(shotid) <= end_shot:
             end_frame = self.shot_frames[self.gen_key(imdbid, shotid)][1]
+        #得到该shot对应的label
         label = 0
         if 'annos_dict' in self.data_dict:
             label = self.data_dict["annos_dict"].get(imdbid).get(shotid, 0)
+            if int(shotid) < 0:
+                label = self.data_dict["annos_dict"].get(imdbid).get(strcal(0, 0), 0)
+            elif int(shotid) > end_shot:
+                label = self.data_dict["annos_dict"].get(imdbid).get(strcal(end_shot, 0), 0)
+        #得到该shot对应feats
         aud_feats, place_feats = [], []
         cast_feats, act_feats = [], []
         if 'place' in self.mode:
@@ -160,31 +173,7 @@ class Preprocessor(data.Dataset):
             act_feats = torch.stack(act_feats)
         if len(aud_feats) > 0:
             aud_feats = torch.stack(aud_feats)
-        return place_feats, cast_feats, act_feats, aud_feats, label, end_frame, imdbid
-
-        '''
-        shotid = ID["shotid"]
-        imgs = []
-        label = 1  # this is a pesudo label
-        if 'image' in self.mode:
-            for ind in self.shot_boundary_range:
-                if int(shotid) + ind < self.padding_head:
-                    name = 'shot_{}_img_1.jpg'.format(strcal(self.padding_head, 0))
-                elif int(shotid) + ind > self.padding_tail:
-                    name = 'shot_{}_img_1.jpg'.format(strcal(self.padding_tail, 0))
-                else:
-                    name = 'shot_{}_img_1.jpg'.format(strcal(shotid, ind))
-                path = osp.join(
-                    self.cfg.data_root, 'shot_keyf', self.cfg.video_name, name)
-                img = Image.open(path).convert('RGB')
-                if self.transform:
-                    img = self.transform(img)
-                imgs.append(img)
-
-        if len(imgs) > 0:
-            imgs = torch.stack(imgs)
-        return imgs, label
-        '''
+        return place_feats, cast_feats, act_feats, aud_feats, label, end_frame, imdbid, int(shotid), end_shot
 
 def get_train_data(cfg):
     print('start data pre')

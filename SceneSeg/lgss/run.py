@@ -21,8 +21,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Runner')
     parser.add_argument('--config', type=str,
                         default='/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/train_hsv.py')
-    parser.add_argument('--annotation_file', type=str,
-                        default='/home/tione/notebook/dataset/GroundTruth/train5k.txt')
+    parser.add_argument('--annotation_file', type=str, default='/home/tione/notebook/dataset/GroundTruth/train5k.txt')
+    parser.add_argument('--topn', type=int, default=-1)
+    parser.add_argument('--smooth_threshold', type=float, default=0.1)
     args = parser.parse_args()
     return args
 
@@ -42,7 +43,7 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
     total_loss = 0.0
     cnt = 0
     model.train()
-    for batch_idx, (data_place, data_cast, data_act, data_aud, target, end_frames, video_ids) in enumerate(train_loader):
+    for batch_idx, (data_place, data_cast, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids) in enumerate(train_loader):
         #print(data_place, data_cast, data_act, data_aud, target, end_frames, video_ids)
         data_place = data_place.cuda() if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
         data_cast = data_cast.cuda() if 'cast' in cfg.dataset.mode else []
