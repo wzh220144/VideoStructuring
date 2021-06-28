@@ -25,13 +25,13 @@ model = dict(
     aud=dict(cos_channel=512),
     bidirectional=True,
     lstm_hidden_size=512,
-    ratio=[0.8, 0, 0, 0.4],
+    ratio=[0.8, 0, 0, 0.2],
     num_layers=2,
     )
 
 # optimizer
 optim = dict(name='Adam',
-             setting=dict(lr=1e-3, weight_decay=5e-4))
+             setting=dict(lr=1e-2, weight_decay=5e-4))
 stepper = dict(name='MultiStepLR',
                setting=dict(milestones=[15, 30, 40, 50], gamma=0.1))
 loss = dict(weight=[0.5, 5])
