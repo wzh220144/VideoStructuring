@@ -32,6 +32,7 @@ class Data_Pipeline:
                                                            tuple(self.dtype_list),
                                                            tuple(self.data_shape_list))
         self.dataset = self.dataset.batch(self.batch_size).prefetch(20)
+        #self.dataset = self.dataset.batch(self.batch_size)
         self.iterator = self.dataset.make_initializable_iterator()
         self.data_op_lst = self.iterator.get_next()
         self.name_to_data_op = {}

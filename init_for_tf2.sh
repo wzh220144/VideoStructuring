@@ -87,7 +87,7 @@ source "${CONDA_ROOT}/etc/profile.d/conda.sh"
 # ###### create env and activate
 # TensorFlow 1.14 GPU dependencies - https://www.tensorflow.org/install/source#gpu
 # create env by prefix
-conda create --prefix ${JUPYTER_ROOT}/envs/${CONDA_NEW_ENV} -y cudatoolkit=10.0 cudnn=7.6.0 python=3.7 ipykernel
+conda create --prefix ${JUPYTER_ROOT}/envs/${CONDA_NEW_ENV} -y cudatoolkit=10.1 cudnn=7.6.0 python=3.6 ipykernel
 conda activate ${JUPYTER_ROOT}/envs/${CONDA_NEW_ENV}
 # create env by name
 # conda create -n ${CONDA_NEW_ENV} -y cudatoolkit=10.0 cudnn=7.6.0 python=3.7 ipykernel
@@ -109,7 +109,7 @@ pip install torch==1.8.1+cu101 torchvision==0.9.1+cu101 torchaudio -f https://do
 sudo apt-get install swig libpulse-dev libasound2-dev
 pip install -r requirement.txt
 pip install pytest-runner
-pip install tensorflow-gpu==2.0 opencv-python librosa==0.7.2 tensorboardX==2.1 easyocr SpeechRecognition PocketSphinx
+pip install tensorflow-gpu==2.2.0 opencv-python librosa==0.7.2 tensorboardX==2.1 easyocr SpeechRecognition PocketSphinx
 pip install mmcv -i http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com
 pip install numba==0.48.0
 pip install cachetools

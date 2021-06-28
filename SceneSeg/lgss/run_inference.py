@@ -26,7 +26,8 @@ def load_model(cfg, args, use_best = True):
     else:
         checkpoint = load_checkpoint(cfg.model_path + '/checkpoint.pth.tar', args.use_gpu)
     model.load_state_dict(checkpoint['state_dict'], strict=False)
-    threshold = checkpoint['checkpoint']
+    threshold = checkpoint['threshold']
+    print('threshold: {}'.format(threshold))
     if args.use_gpu == 1:
         model = nn.DataParallel(model)
     return model, threshold
@@ -43,8 +44,10 @@ def main(cfg, args, video_name, value, threshold):
         if label == 1:
             scene_list.append([start_frame, end_frame])
             start_frame = end_frame + 1
-    if end_frames[-1] > start_frame:
+    if len(end_frames) > 0 and end_frames[-1] > start_frame:
         scene_list.append([start_frame, end_frames[-1]])
+    if len(end_frames) == 0:
+        print('{}, {}, {}'.format(video_name, value, scene_list))
     scene2video(cfg, scene_list, args, video_name)
 
 def parse_args():
@@ -95,15 +98,8 @@ if __name__ == '__main__':
             video_inference_res[video_name][k] = {'prob': prob.item(), 'label': label}
         video_inference_res[video_name][k]['prob'] = max(video_inference_res[video_name][k]['prob'], prob.item())
     os.makedirs(os.path.join(cfg.data_root, "seg_results"), exist_ok=True)
+    
     for video_name, value in video_inference_res.items():
         log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
         with open(log_path, 'w') as f:
             json.dump(value, f, ensure_ascii=False, indent=4)
-
-    results = []
-    with ThreadPoolExecutor(max_workers = args.max_workers) as executor:
-        for video_name, value in video_inference_res.items():
-            results.append(executor.submit(main, cfg, args, video_name, value, threshold))
-        for res in results:
-            res.result()
-    print('done')

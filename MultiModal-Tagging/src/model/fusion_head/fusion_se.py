@@ -39,6 +39,5 @@ class SE():
             gates = slim.batch_norm(gates, center=True, scale=True, is_training=is_training, scope="gating_last_bn")
 
         gates = tf.sigmoid(gates)
-        #tf.summary.histogram("final_gates", gates)
         activation = tf.multiply(activation, gates)
         return activation

@@ -10,11 +10,16 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf
 import tensorflow as tf2
-import tensorflow.compat.v1.logging as logging
+import logging
 import tf_slim as slim
 import src.loss as loss_lib
 import utils.train_util as train_util
 from utils.base_trainer import Trainer, ParameterServer, train_main
+import pysnooper
+
+formatter = logging.Formatter(fmt='%(asctime)s, %(pathname)s.%(funcName)s:%(lineno)d, %(thread)d, %(levelname)s] %(message)s', datefmt='%a, %d %b %Y %H:%M:%S')
+for h in tf.get_logger().handlers:
+    h.setFormatter(formatter)
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -69,7 +74,7 @@ class TaggingTrainer(Trainer):
         #hit_at_one = train_util.calculate_hit_at_one(predictions_val, labels_val)
         #perr = train_util.calculate_precision_at_equal_recall_rate(predictions_val, labels_val)
         gap = train_util.calculate_gap(predictions_val, labels_val)
-        print(predictions_val.shape, labels_val.shape)
+        #print(predictions_val.shape, labels_val.shape)
         train_pr_calculator.accumulate(predictions_val, labels_val)
         precision_at_1 = train_pr_calculator.get_precision_at_conf(0.1)
         precision_at_5 = train_pr_calculator.get_precision_at_conf(0.5)
@@ -135,11 +140,7 @@ class TaggingTrainer(Trainer):
         #return epoch_info_dict['gap'] + np.mean(epoch_info_dict['aps']) #融合特征的预测结果
         return np.mean(epoch_info_dict['aps']) #融合特征的预测结果
 
-
-if __name__ == "__main__":
-    for x in tf.config.experimental.list_physical_devices('GPU'):
-        tf2.config.experimental.set_memory_growth(x, True)
-
+def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--config',default='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/configs/config.structuring.5k.yaml',type=str)
@@ -147,5 +148,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     tf.disable_eager_execution()
     if args.use_gpu == 1:
-        os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+        os.environ["CUDA_VISIBLE_DEVICES"] = '1'
     train_main(args.config, TaggingTrainer)
+
+if __name__ == "__main__":
+    main()

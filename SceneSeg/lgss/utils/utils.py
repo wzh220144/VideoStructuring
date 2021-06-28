@@ -11,8 +11,7 @@ import torch
 
 
 def mkdir_ifmiss(directory):
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    os.makedirs(directory, exist_ok=True)
 
 
 def get_folder_list(checked_directory,log_fn):

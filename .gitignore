@@ -2,3 +2,7 @@ __pycache__
 *.pyc
 .idea
 .ipynb_checkpoints
+dataset
+*.log
+log
+pretrained

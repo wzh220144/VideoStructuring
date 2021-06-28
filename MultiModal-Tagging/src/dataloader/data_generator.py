@@ -7,6 +7,8 @@ import linecache
 import importlib
 from tomorrow3 import threads
 import json
+import tqdm
+import time
 
 class Data_Generator:
     
@@ -39,28 +41,28 @@ class Data_Generator:
 
         # +1 blank line for seperate
         self.data_num_per_sample = self.feature_num_per_sample + self.label_num_per_sample + 1
-        print(self.data_num_per_sample)
+        #print(self.data_num_per_sample)
 
         self.train_data_source_list = self.data_config['train_data_source_list']
         for source_name in self.train_data_source_list:
             fn = self.train_data_source_list[source_name]['file']
             sample_count = self.fn_sample_count(fn)
-            print('Train Source sample_count: ',source_name,sample_count)
+            print('Train Source sample_count: ',source_name, sample_count)
             self.train_data_source_list[source_name]['sample_count'] = sample_count
             batch_size = self.train_data_source_list[source_name]['batch_size']
             batch_num = max(1, sample_count // batch_size)
-            print('Train Source batch_num: ',source_name,batch_num)
+            print('Train Source batch_num: ', source_name, batch_num)
             self.train_data_source_list[source_name]['batch_num'] = batch_num
 
         self.valid_data_source_list = self.data_config['valid_data_source_list']
         for source_name in self.valid_data_source_list:
             fn = self.valid_data_source_list[source_name]['file']
             sample_count = self.fn_sample_count(fn)
-            print('Valid Source: ', source_name,sample_count)
+            print('Valid Source: ', source_name, sample_count)
             self.valid_data_source_list[source_name]['sample_count'] = sample_count
             batch_size = self.valid_data_source_list[source_name]['batch_size']
             batch_num = max(1, sample_count // batch_size)
-            print('Valid Source batch_num: ',source_name,batch_num)
+            print('Valid Source batch_num: ',source_name, batch_num)
             self.valid_data_source_list[source_name]['batch_num'] = batch_num
 
 
@@ -136,6 +138,7 @@ class Data_Generator:
                 source_batch_size = self.train_data_source_list[source_name]['batch_size']
                 for _ in range(source_batch_size):
                     return_list = self.train_source_generator[source_name].__next__()
+                    #print(return_list)
                     yield return_list
 
     def get_valid_sample_generator_dict(self):
@@ -154,6 +157,7 @@ class Data_Generator:
         root = self.data_config['preprocess_root']
         sys.path.append(root)
         index_to_preprocess = []
+        self.index_preprocess_module = []
 
         for data_part in self.feature_config:
             package_name, preprocess_class_name = data_part['class'].split('.')
@@ -166,6 +170,7 @@ class Data_Generator:
             Preprocess_Class = getattr(preprocess_module, preprocess_class_name)
             preprocess_instance = Preprocess_Class(**init_args)
             index_to_preprocess.append(preprocess_instance)
+            self.index_preprocess_module.append(preprocess_module)
 
         for data_part in self.label_config:
             package_name, preprocess_class_name = data_part['class'].split('.')
@@ -179,18 +184,22 @@ class Data_Generator:
             name = data_part['name']
             self.label_num_dict[name] = preprocess_instance.label_num
             index_to_preprocess.append(preprocess_instance)
+            self.index_preprocess_module.append(preprocess_module)
         self.index_to_preprocess = index_to_preprocess
         
-        @threads(20)
+        @threads(30)
         def preprocess_fn(*args):
             preprocess_data_list = []
             for index, data in enumerate(args):
+                begin = time.time()
                 preprocess_data = self.index_to_preprocess[index](data)
                 if isinstance(preprocess_data,np.ndarray):
                    preprocess_data_list.append(preprocess_data)
                 elif isinstance(preprocess_data, tuple):
                    for preprocess_data_element in preprocess_data:
                        preprocess_data_list.append(preprocess_data_element)
+                end = time.time()
+                #print(len(args), index, self.index_preprocess_module[index], end - begin, data, preprocess_data)
             return tuple(preprocess_data_list)
 
         return preprocess_fn
@@ -217,7 +226,7 @@ if __name__ == '__main__':
            end_time = time.time()
            time_list_sum += (end_time-start_time)
            time_count += 1
-           print(time_count,np.mean(time_list_sum)/time_count)
+           #print(time_count,np.mean(time_list_sum)/time_count)
            for x,output_name in zip(sample,data_generator.dname_string_list):
                print(x, output_name)
 

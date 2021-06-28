@@ -13,7 +13,8 @@ import traceback
 
 import tensorflow as tf2
 import tensorflow.compat.v1 as tf
-from tensorflow.compat.v1 import logging
+import tensorflow.compat.v1.logging as tf_logging
+import logging
 from tensorflow.compat.v1 import gfile
 import tf_slim as slim
 
@@ -26,6 +27,8 @@ import utils.train_util as train_util
 import src.loss as loss_lib
 from utils.train_util import ParameterServer,task_as_string,start_server
 from utils.export_model import ModelExporter
+import pysnooper
+import numpy as np
 
 class Trainer(object):
     def __init__(self, cluster, task, model, reader, configs):
@@ -81,7 +84,7 @@ class Trainer(object):
         #cpu_devices = [x.name for x in device_lib.list_local_devices() if 'CPU' in x.device_type]
         cpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('CPU')]
         #print(cpu_devices)
-        num_gpus = len(gpus)
+        num_gpus = len(gpu_devices)
         if num_gpus > 0:
             logging.info("Using the following GPUs to train: " + str(gpus))
             num_towers = num_gpus
@@ -128,7 +131,7 @@ class Trainer(object):
                 device = cpu_devices[i]
             with tf.device(device):
                 with (tf.variable_scope(("tower"), reuse=True if i > 0 else None)):
-                    with (slim.arg_scope([slim.model_variable, slim.variable], device=cpu_devices[0])):
+                    with (slim.arg_scope([slim.model_variable, slim.variable], device=gpu_devices[0])):
                         result_dict = self.model(tower_inputs[i],train_batch_size = self.reader.batch_size//num_towers, is_training=True)
     
                         #遍历所有分类任务输出
@@ -177,7 +180,7 @@ class Trainer(object):
         vars_dict['classifier'] = [] #新增分类器独立学习率参数设置
         for grad, var in merged_gradients:
             flag_in_key = False
-            print(var.name)
+            #print(var.name)
             for key in vars_dict:
               if key in var.name:
                 vars_dict[key].append((grad, var))
@@ -208,6 +211,7 @@ class Trainer(object):
         self.train_inputs_dict = raw_inputs_dict
         self.train_losses_dict = tower_losses_dict
         self.train_tagging_predictions = tf.concat(tower_predictions_dict['tagging'], 0)
+        self.result_dict = result_dict
         #self.train_classification_predictions = tf.concat(tower_predictions_dict['classification'], 0)
 
     def build_eval_graph(self):
@@ -247,6 +251,88 @@ class Trainer(object):
 
         self.best_validation_score = -1.0
 
+    def sub_run(self):
+        logging.info("%s: Starting managed session.", task_as_string(self.task))
+        total_iteration = self.optimizer_config.max_step_num
+        cnt = 0
+        with self.sv.managed_session(self.target, config=self.config) as sess:
+            try:
+                logging.info("%s: Entering training loop.", task_as_string(self.task))
+                while not self.sv.should_stop():
+                    try:
+                        cnt += 1
+                        batch_start_time = time.time()
+                        train_fetch_dict = {}
+                        for k, v in self.train_fetch_dict.items():
+                            train_fetch_dict[k] = v
+                        for k, v in self.train_inputs_dict.items():
+                            train_fetch_dict[k] = v
+                        for k, v in self.result_dict.items():
+                            train_fetch_dict[k] = v
+
+                        train_fetch_dict_eval = sess.run(train_fetch_dict)
+                        global_step_val = train_fetch_dict_eval['global_step']
+                        #print(train_fetch_dict_eval)
+                        train_losses_dict = train_fetch_dict_eval['train_losses_dict']
+                        if global_step_val > total_iteration:
+                            logging.info("step limit reached")
+                            break
+
+                        seconds_per_batch = time.time() - batch_start_time
+                        examples_per_second = self.reader.batch_size / seconds_per_batch
+                        if self.is_master and train_fetch_dict_eval['global_step'] % 10 == 0 and self.optimizer_config.train_dir:
+                            self.train_metric_log(train_fetch_dict_eval, examples_per_second)
+                            time_to_export = global_step_val % self.optimizer_config.export_model_steps == 0
+                            if self.is_master and time_to_export:
+                                valid_sample_generator_dict =  self.reader.get_valid_sample_generator_dict()
+                                val_score_dict={}
+                                for source_name, generator in valid_sample_generator_dict.items():
+                                  val_score = self.eval(sess, global_step_val, generator, source_name) # 在验证集上测试模型
+                                  val_score_dict[source_name] = val_score
+                                  logging.info("validation score on {} is : {:.4f}".format(source_name, val_score))
+                                self.export_model(global_step_val, sess, val_score_dict)
+                        else:
+                            train_losses_info = "|".join(["{}: {:.3f}".format(k, v) for k,v in train_losses_dict.items()])
+                            flag = False
+                            for k, v in train_losses_dict.items():
+                                if str(v) == 'nan':
+                                    flag = True
+                            if flag:
+                                tmp_dict = {'global_step': train_fetch_dict_eval['global_step'], 'train_losses_dict': train_fetch_dict_eval['train_losses_dict']}
+                                print(tmp_dict)
+                                for k, v in train_fetch_dict_eval.items():
+                                    if isinstance(v, dict):
+                                        for kk, vv in v.items():
+                                            tmp_dict['{}.{}'.format(k, kk)] = vv
+                                    else:
+                                        tmp_dict[k] = v
+
+                                l = train_fetch_dict_eval['train_tagging_labels'].shape[0]
+                                keys = ['train_tagging_labels',
+                                        'tagging',
+                                        'tagging_output_fusion.predictions', 'tagging_output_audio.predictions',
+                                        'tagging_output_video.predictions', 'tagging_output_image.predictions', 'tagging_output_text.predictions']
+                                for k in keys:
+                                    print(k, tmp_dict[k].shape)
+                                    tmp_dict[k].dump('{}_{}'.format(k, cnt))
+                                for i in range(l):
+                                    res_dict = {}
+                                    for k in keys:
+                                        res_dict[k] = tmp_dict[k][i]
+                                    res_dict['index'] = i
+                                    print(res_dict)
+                            logging.info("training step {} | {} | {:.2f} Examples/sec".format(global_step_val, train_losses_info, examples_per_second))
+                    except tf.errors.DataLossError:
+                        logging.info("ERROR: corrupted input tfrecord")
+            except tf.errors.OutOfRangeError:
+                logging.info("%s: Done training -- step limit reached.",
+                             task_as_string(self.task))
+            except:
+                traceback.print_exc()
+
+        logging.info("%s: Exited training loop.", task_as_string(self.task))
+        self.sv.stop()
+
     def run(self, config_path):
         """训练验证主流程"""
         #训练目录设置
@@ -281,49 +367,9 @@ class Trainer(object):
             save_summaries_secs = 120,
             saver = saver)
         self.summary_writer = self.sv.summary_writer
-        logging.info("%s: Starting managed session.", task_as_string(self.task))
+        self.sub_run()
 
-        total_iteration = self.optimizer_config.max_step_num
-        with self.sv.managed_session(self.target, config=self.config) as sess:
-            try:
-                logging.info("%s: Entering training loop.", task_as_string(self.task))
-                while not self.sv.should_stop():
-                    try:
-                        batch_start_time = time.time()
-                        train_fetch_dict_eval = sess.run(self.train_fetch_dict)
-                        global_step_val = train_fetch_dict_eval['global_step']
-                        train_losses_dict = train_fetch_dict_eval['train_losses_dict']
-                        if global_step_val>total_iteration:
-                            logging.info("step limit reached")
-                            break
-
-                        seconds_per_batch = time.time() - batch_start_time
-                        examples_per_second = self.reader.batch_size / seconds_per_batch
-                        if self.is_master and train_fetch_dict_eval['global_step'] % 10 == 0 and self.optimizer_config.train_dir:
-                            self.train_metric_log(train_fetch_dict_eval, examples_per_second)
-                            time_to_export = global_step_val % self.optimizer_config.export_model_steps == 0
-                            if self.is_master and time_to_export:
-                                valid_sample_generator_dict =  self.reader.get_valid_sample_generator_dict()
-                                val_score_dict={}
-                                for source_name, generator in valid_sample_generator_dict.items():
-                                  val_score = self.eval(sess, global_step_val, generator, source_name) # 在验证集上测试模型
-                                  val_score_dict[source_name] = val_score
-                                  logging.info("validation score on {} is : {:.4f}".format(source_name, val_score))
-                                self.export_model(global_step_val, sess, val_score_dict)
-                        else:
-                            train_losses_info = "|".join(["{}: {:.3f}".format(k, v) for k,v in train_losses_dict.items()])
-                            logging.info("training step {} | {} | {:.2f} Examples/sec".format(global_step_val, train_losses_info, examples_per_second))
-                    except tf.errors.DataLossError:
-                        logging.info("ERROR: corrupted input tfrecord")
-            except tf.errors.OutOfRangeError:
-                logging.info("%s: Done training -- step limit reached.",
-                             task_as_string(self.task))
-            except:
-                traceback.print_exc()
-
-        logging.info("%s: Exited training loop.", task_as_string(self.task))
-        self.sv.stop()
-
+        
     def build_model(self):
         self.build_train_graph()        
         self.build_eval_graph()
@@ -401,7 +447,7 @@ class Trainer(object):
 #训练流程
 def train_main(config_path, TrainerType):
     config = yaml.load(open(config_path))
-    print(config)
+    #print(config)
 
     env = json.loads(os.environ.get("TF_CONFIG", "{}"))
     cluster_data = env.get("cluster", None)
@@ -410,7 +456,7 @@ def train_main(config_path, TrainerType):
     task = type("TaskSpec", (object,), task_data)
 
     # Logging the version.
-    logging.set_verbosity(tf.logging.INFO)
+    tf_logging.set_verbosity(tf_logging.INFO)
     logging.info("%s: Tensorflow version: %s.",task_as_string(task), tf.__version__)
 
     # Dispatch to a master, a worker, or a parameter server.
