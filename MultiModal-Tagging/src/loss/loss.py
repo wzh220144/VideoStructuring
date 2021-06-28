@@ -27,13 +27,13 @@ class CrossEntropyLoss(BaseLoss):
 
   def calculate_loss(self, predictions, labels, **unused_params):
     with tf.name_scope("loss_xent"):
-      epsilon = 1e-8
+      epsilon = 1e-6
+      predictions1 = tf.clip_by_value(1 - predictions, epsilon, 1.0 - epsilon)
+      predictions2 = tf.clip_by_value(predictions, epsilon, 1.0 - epsilon)
       label_smooth_rate = unused_params.get('label_smooth_rate', 0.0)
-      float_labels = tf.cast(labels, tf.float32)*(1.0-label_smooth_rate) + \
-                     (1.0-tf.cast(labels, tf.float32)) * label_smooth_rate
-
-      cross_entropy_loss = float_labels * tf.log(predictions + epsilon) + (
-          1 - float_labels) * tf.log(1 - predictions + epsilon)
+      float_labels = tf.cast(labels, tf.float32)*(1.0 - label_smooth_rate) + \
+                     (1.0 - tf.cast(labels, tf.float32)) * label_smooth_rate
+      cross_entropy_loss = float_labels * tf.log(predictions2) + (1 - float_labels) * tf.log(predictions1)
       cross_entropy_loss = tf.negative(cross_entropy_loss)
       alpha = unused_params.get('loss_weight', 1.0) #alpha shape=[batch_size]
       return tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1)*alpha)

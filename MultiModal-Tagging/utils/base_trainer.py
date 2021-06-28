@@ -311,7 +311,7 @@ class Trainer(object):
                                 keys = ['train_tagging_labels',
                                         'tagging',
                                         'tagging_output_fusion.predictions', 'tagging_output_audio.predictions',
-                                        'tagging_output_video.predictions', 'tagging_output_image.predictions']
+                                        'tagging_output_video.predictions', 'tagging_output_image.predictions', 'tagging_output_text.predictions']
                                 for k in keys:
                                     print(k, tmp_dict[k].shape)
                                     tmp_dict[k].dump('{}_{}'.format(k, cnt))

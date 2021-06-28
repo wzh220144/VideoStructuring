@@ -102,10 +102,13 @@ def scene2video(cfg, scene_list, args, video_name):
     fps = vcap.get(cv2.CAP_PROP_FPS)
     last_frame = vcap.get(cv2.CAP_PROP_FRAME_COUNT) - 1
     out_video_dir_fn = cfg.output_root
-    t = scene_list[-1][1] + 1
-    if t < last_frame:
-        scene_list.append([t, last_frame])
-    mkdir_ifmiss(out_video_dir_fn)
+    if len(scene_list) == 0:
+        scene_list.append([0, last_frame])
+    else:
+        t = scene_list[-1][1] + 1
+        if t < last_frame:
+            scene_list.append([t, last_frame])
+    #mkdir_ifmiss(out_video_dir_fn)
     #fs = open('{}/{}.info'.format(out_video_dir_fn, video_name))
     for scene_ind, scene_item in enumerate(scene_list):
         scene = str(scene_ind).zfill(4)
@@ -120,10 +123,11 @@ def scene2video(cfg, scene_list, args, video_name):
                                                                                           end_time,
                                                                                           int(np.ceil(fps))))
         if osp.exists(out_video_fn):
-            print(out_video_fn + ' exist.')
+            #print(out_video_fn + ' exist.')
             continue
         else:
-            print(out_video_fn + ' not exist.')
+            #print(out_video_fn + ' not exist.')
+            pass
         call_list = ['ffmpeg']
         call_list += ['-loglevel', 'warning']
         call_list += ['-hide_banner']

@@ -106,6 +106,10 @@ DatasetConfig:
     train1:
       file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/train.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
+    train2:
+      file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/train.txt' # preprocessing脚本生成datafile文件，按需求修改
+      batch_size: 128
+
 
   valid_data_source_list:
     val1:

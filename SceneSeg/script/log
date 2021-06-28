@@ -1,8 +1,0 @@
-start data pre
-start data partition
-start train data pre process
-start val data pre process
-...data and model loaded
-...begin training
-epoch 1: [3168/16784 (19%)]	loss: 0.632799, auc: 0.665670, acc: 0.553203, recall: 0.677763, precision: 0.162802, ap: 0.272109, f1: 0.262540
-epoch 1: [6368/16784 (38%)]	loss: 0.573374, auc: 0.760230, acc: 0.714297, recall: 0.662483, precision: 0.241745, ap: 0.368454, f1: 0.354229
