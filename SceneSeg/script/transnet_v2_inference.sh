@@ -7,4 +7,4 @@
 # Version: 1.0
 #########################################################################
 cd /home/tione/notebook/VideoStructuring/SceneSeg
-python -u /home/tione/notebook/VideoStructuring/SceneSeg/lgss/run_inference.py --config=/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/inference_transnet_v2.py --threshold=0.88
+python -u /home/tione/notebook/VideoStructuring/SceneSeg/lgss/run_inference.py --config=/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/inference_transnet_v2.py

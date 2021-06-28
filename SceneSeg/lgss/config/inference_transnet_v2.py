@@ -44,5 +44,5 @@ trainFlag = False
 testFlag = True
 batch_size = 64
 epochs = 30
-logger = dict(log_interval=200, logs_dir="/home/tione/notebook/SceneSeg/{}".format(experiment_name))
+logger = dict(log_interval=200, logs_dir="/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/{}".format(experiment_name))
 data_loader_kwargs = dict(num_workers=14, pin_memory=True, drop_last=False)

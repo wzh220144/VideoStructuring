@@ -4,8 +4,8 @@ experiment_description = "scene segmentation using images only"
 # overall confg
 data_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_hsv'
 video_dir = '/home/tione/notebook/dataset/videos/test_5k_2nd'
-model_path = '/home/tione/notebook/dataset/model/seg/shot_hsv'
-output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_hsv_output'
+model_path = '/home/tione/notebook/dataset/test_5k_2nd/shot_hsv/model'
+output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_hsv/output'
 shot_frm_path = data_root + "/shot_txt"
 video_name = "test"
 shot_num = 6
@@ -45,5 +45,5 @@ trainFlag = False
 testFlag = True
 batch_size = 128
 epochs = 30
-logger = dict(log_interval=200, logs_dir="/home/tione/notebook/SceneSeg/{}".format(experiment_name))
+logger = dict(log_interval=200, logs_dir="/home/tione/notebook/dataset/test_5k_2nd/shot_hsv/{}".format(experiment_name))
 data_loader_kwargs = dict(num_workers=1, pin_memory=True, drop_last=False)

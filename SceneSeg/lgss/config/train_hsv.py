@@ -3,7 +3,7 @@ experiment_description = "scene segmentation with all modality"
 # overall confg
 data_root = '/home/tione/notebook/dataset/train_5k_A/shot_hsv'
 video_dir = '/home/tione/notebook/dataset/videos/train_5k_A'
-model_path = '/home/tione/notebook/dataset/model/seg/shot_hsv'
+model_path = '/home/tione/notebook/dataset/train_5k_A/shot_hsv/model'
 shot_frm_path = data_root + "/shot_txt"
 shot_num = 6  # even
 seq_len = 4  # even
@@ -42,5 +42,5 @@ trainFlag = 1
 testFlag = 0
 batch_size = 64
 epochs = 100
-logger = dict(log_interval=100, logs_dir="/home/tione/notebook/SceneSeg/{}".format(experiment_name))
+logger = dict(log_interval=100, logs_dir="/home/tione/notebook/dataset/train_5k_A/shot_hsv/{}".format(experiment_name))
 data_loader_kwargs = dict(num_workers=14, pin_memory=True, drop_last=True)
