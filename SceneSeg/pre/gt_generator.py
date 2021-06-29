@@ -26,9 +26,11 @@ def parse_annotation(input_annotation, video_dir):
 #         annotation_dict = json.load(f)
         annotation_dict = json.loads(f.read())
     scene_dict = {}
+    video_id_fps_dict = {}
     for key, value in tqdm.tqdm(annotation_dict.items()):
         video_id = key.strip().split('.mp4')[0]
         frame_count, fps, h,w = read_video_info(os.path.join(video_dir, key))
+        video_id_fps_dict[video_id] = fps
         annotations= value["annotations"]
         boundary_list = [annotations[0]["segment"][0]*fps]
         if boundary_list[0] > 0.0:
@@ -41,9 +43,29 @@ def parse_annotation(input_annotation, video_dir):
             boundary_list.append(annotations[i]["segment"][1]*fps)
         scene_dict[video_id] = boundary_list[1:-1]
         #assert len(scene_dict[video_id])>0, "{}:{}".format(key, value)
-    return scene_dict
+    return scene_dict, video_id_fps_dict
 
-def match_shot_scene_boundary(save_dir, shot_dict, scene_dict):
+def match_precise_shot_scene_boundary(save_dir, shot_dict, scene_dict, video_id_fps_dict):
+    """
+    将与场景边界最近邻的shot boundary认为是转场
+    """
+    for video_id, scene_list in scene_dict.items():
+        positive_shots = set()
+        shots = [x / video_id_fps_dict[video_id] for x in shot_dict[video_id]]
+        scene_list = [x / video_id_fps_dict[video_id] for x in sorted(scene_list)]
+        for i in range(len(scene_list)):
+            for j in range(len(shots)):
+                if abs(scene_list[i] - shots[j]) <= 0.5:
+                    positive_shots.add(j)
+
+        with open(os.path.join(save_dir, video_id+".txt"), "w") as f:
+            for i in range(len(shots)):
+                if i in positive_shots:
+                    f.write("{} 1\n".format(str(i).zfill(4)))
+                else:
+                    f.write("{} 0\n".format(str(i).zfill(4)))
+
+ def match_shot_scene_boundary(save_dir, shot_dict, scene_dict):
     """
     将与场景边界最近邻的shot boundary认为是转场
     """
@@ -54,7 +76,7 @@ def match_shot_scene_boundary(save_dir, shot_dict, scene_dict):
             continue
         shots = shot_dict[video_id]
         for scene in scene_list:
-             positive_shots.add(shots.index(min(shots, key = lambda x: abs(x-scene))))
+            positive_shots.add(shots.index(min(shots, key = lambda x: abs(x-scene))))
 
         with open(os.path.join(save_dir, video_id+".txt"), "w") as f:
             for i in range(len(shots)):
@@ -89,13 +111,15 @@ if __name__ == "__main__":
             continue
         shot_dict[video_id] = shot_frame_list[:-1] 
 
-    scene_dict = parse_annotation(args.input_annotation, args.video_dir)
+    scene_dict, video_id_fps_dict = parse_annotation(args.input_annotation, args.video_dir)
     print('shot_dict num', len(shot_dict))
     print('scene_dict num', len(scene_dict))
     
     save_label_dir = os.path.join(args.data_root, "labels")
     os.makedirs(save_label_dir, exist_ok = True)
-    match_shot_scene_boundary(save_label_dir, shot_dict, scene_dict)
+    #match_shot_scene_boundary(save_label_dir, shot_dict, scene_dict)
+    match_precise_shot_scene_boundary(save_label_dir, shot_dict, scene_dict, video_id_fps_dict)
+
 
     split_dict = {"train":[], "val":[], "all":[]}
     for gt_txt in os.listdir(os.path.join(args.data_root, "labels")):
@@ -112,7 +136,7 @@ if __name__ == "__main__":
     with open(os.path.join(args.data_root, "meta", "split.json"), "w") as f:
         json.dump(split_dict, f, indent = 4)
 
-    for gt_txt in os.listdir(os.path.join(args.data_root, "labels")):
-       video_id = gt_txt.split(".txt")[0]
-       with open(os.path.join(args.data_root, "meta", "list_test.txt"), "a+") as f:
-           f.write("".join([video_id, ".mp4", "\n"]))
+    with open(os.path.join(args.data_root, "meta", "list_test.txt"), "w") as f:
+        for gt_txt in os.listdir(os.path.join(args.data_root, "labels")):
+            video_id = gt_txt.split(".txt")[0]
+            f.write("".join([video_id, ".mp4", "\n"]))
