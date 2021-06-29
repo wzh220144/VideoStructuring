@@ -27,6 +27,6 @@ def get_data(cfg, video_names):
         for i in range(len(shotid_list) // cfg.seq_len):
                 one_idxs = []
                 for j in range(cfg.seq_len):
-                    one_idxs.append({'imdbid': video_name, 'shotid': strcal(cfg.seq_len * i, j), "endshot":  strcal(end_shot, 0)})
+                    one_idxs.append({'imdbid': video_name, 'shotid': strcal(shotid_list[cfg.seq_len * i + j], 0), "endshot":  strcal(end_shot, 0)})
                 one_mode_idxs.append(one_idxs)
     return one_mode_idxs

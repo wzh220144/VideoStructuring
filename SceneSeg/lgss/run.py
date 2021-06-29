@@ -43,16 +43,15 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
     total_loss = 0.0
     cnt = 0
     model.train()
-    for batch_idx, (data_place, data_cast, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids) in enumerate(train_loader):
-        #print(data_place, data_cast, data_act, data_aud, target, end_frames, video_ids)
+    for batch_idx, (data_place, data_vit, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids) in enumerate(train_loader):
         data_place = data_place.cuda() if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
-        data_cast = data_cast.cuda() if 'cast' in cfg.dataset.mode else []
+        data_vit = data_vit.cuda() if 'vit' in cfg.dataset.mode else []
         data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
         data_aud = data_aud.cuda() if 'aud' in cfg.dataset.mode else []
         target = target.view(-1).cuda()
         #print(len(target))
         optimizer.zero_grad()
-        output = model(data_place, data_cast, data_act, data_aud)
+        output = model(data_place, data_vit, data_act, data_aud)
         output = output.view(-1, 2)
         loss = criterion(output, target)
         loss.backward()

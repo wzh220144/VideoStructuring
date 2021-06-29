@@ -10,15 +10,15 @@ import torch.nn.functional as F
 import sklearn
 import sklearn.metrics
 
-def _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids):
+def _inference(cfg, args, model, criterion, data_place, data_vit, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids):
     total_loss = 0
     data_place = data_place.cuda() if 'place' in cfg.dataset.mode else []
-    data_cast = data_cast.cuda() if 'cast' in cfg.dataset.mode else []
+    data_vit = data_vit.cuda() if 'vit' in cfg.dataset.mode else []
     data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
     data_aud = data_aud.cuda() if 'aud' in cfg.dataset.mode else []
     target = target.view(-1).cuda()
 
-    output = model(data_place, data_cast, data_act, data_aud)
+    output = model(data_place, data_vit, data_act, data_aud)
     #print(data_place.shape, target.shape, output.shape)
     output = output.view(-1, 2)
     loss = criterion(output, target)
@@ -53,10 +53,10 @@ def inference(cfg, args, model, data_loader, criterion):
     res = []
     total_loss = 0.0
     with torch.no_grad():
-        for data_place, data_cast, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids in tqdm.tqdm(data_loader,
+        for data_place, data_vit, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids in tqdm.tqdm(data_loader,
                                                                                                   total=len(
                                                                                                           data_loader), desc='inference'):
-            t, loss = _inference(cfg, args, model, criterion, data_place, data_cast, data_act, data_aud, target,
+            t, loss = _inference(cfg, args, model, criterion, data_place, data_vit, data_act, data_aud, target,
                                  end_frames, video_ids, shot_ids, end_shotids)
             res.extend(t)
             total_loss += loss
@@ -84,11 +84,13 @@ def val(cfg, res, threshold, total_loss, args, fps_dict, topn = -1, smooth_thres
         shot_id = x[4]
         end_shotid = x[5]
         video_ids.add(video_id)
+        '''
         #过滤填充id
         if shot_id > end_shotid:
             continue
         if shot_id < 0:
             continue
+        '''
         #print(x[2], video_id, fps_dict[video_id])
         ts = float(x[2]) / fps_dict[video_id]
         prob = x[1]

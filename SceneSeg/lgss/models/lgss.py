@@ -1,12 +1,26 @@
+#!/bin/env python
+# -*- coding: utf-8 -*-
+########################################################################
+# 
+# Copyright (c) 2021.com, Inc. All Rights Reserved
+# 
+########################################################################
+ 
+"""
+File Name: lgss_moe.py
+Author: Wang Zhihua <wangzhihua@.com>
+Create Time: 2021/06/28 21:56:29
+Brief:      
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pdb
 
-
-class audnet(nn.Module):
+class AudNet(nn.Module):
     def __init__(self, cfg):
-        super(audnet, self).__init__()
+        super(AudNet, self).__init__()
         self.conv1 = nn.Conv2d(1, 64, kernel_size=(3,3), stride=(2,1), padding=0)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu1 = nn.ReLU(inplace=True)
@@ -83,12 +97,12 @@ class BNet(nn.Module):
         return bound
 
 
-class BNet_aud(nn.Module):
+class BNetAud(nn.Module):
     def __init__(self, cfg):
-        super(BNet_aud, self).__init__()
+        super(BNetAud, self).__init__()
         self.shot_num = cfg.shot_num
         self.channel = cfg.model.sim_channel
-        self.audnet = audnet(cfg)
+        self.AudNet = AudNet(cfg)
         self.conv1 = nn.Conv2d(1, self.channel, kernel_size=(cfg.shot_num, 1))
         self.conv2 = nn.Conv2d(1, self.channel, kernel_size=(cfg.shot_num//2, 1))
         self.max3d = nn.MaxPool3d(kernel_size=(self.channel, 1, 1))
@@ -96,7 +110,7 @@ class BNet_aud(nn.Module):
     def forward(self, x):  # [batch_size, seq_len, shot_num, 257, 90]
         context = x.view(
             x.shape[0]*x.shape[1]*x.shape[2], 1, x.shape[-2], x.shape[-1])
-        context = self.audnet(context).view(
+        context = self.AudNet(context).view(
             x.shape[0]*x.shape[1], 1, self.shot_num, -1)
         part1, part2 = torch.split(context, [self.shot_num//2]*2, dim=2)
         part1 = self.conv2(part1).squeeze()
@@ -115,14 +129,14 @@ class LGSSone(nn.Module):
         if mode == "place":
             self.input_dim = (cfg.model.place_feat_dim+cfg.model.sim_channel)
             self.bnet = BNet(cfg)
-        elif mode == "cast":
+        elif mode == "vit":
             self.bnet = BNet(cfg)
-            self.input_dim = (cfg.model.cast_feat_dim+cfg.model.sim_channel)
+            self.input_dim = (cfg.model.vit_feat_dim+cfg.model.sim_channel)
         elif mode == "act":
             self.bnet = BNet(cfg)
             self.input_dim = (cfg.model.act_feat_dim+cfg.model.sim_channel)
         elif mode == "aud":
-            self.bnet = BNet_aud(cfg)
+            self.bnet = BNetAud(cfg)
             self.input_dim = cfg.model.aud_feat_dim
         else:
             pass
@@ -133,23 +147,31 @@ class LGSSone(nn.Module):
                             bidirectional=cfg.model.bidirectional)
 
         if cfg.model.bidirectional:
-            self.fc1 = nn.Linear(self.lstm_hidden_size*2, 100)
+            if cfg.model.model_mode == 1:
+                self.fc1 = nn.Linear(self.lstm_hidden_size, 100)
+            elif cfg.model.model_mode == 2:
+                self.fc1 = nn.Linear(self.lstm_hidden_size, 128)
         else:
-            self.fc1 = nn.Linear(self.lstm_hidden_size, 100)
+            if cfg.model.model_mode == 1:
+                self.fc1 = nn.Linear(self.lstm_hidden_size, 100)
+            elif cfg.model.model_mode == 2:
+                self.fc1 = nn.Linear(self.lstm_hidden_size, 128)
+
         self.fc2 = nn.Linear(100, 2)
+        self.cfg = cfg
 
     def forward(self, x):
         self.lstm.flatten_parameters()
         x = self.bnet(x)
         x = x.view(-1, self.seq_len, x.shape[-1])
-        # torch.Size([128, seq_len, 3*channel]) 
         out, (_, _) = self.lstm(x, None)
-        # out: tensor of shape (batch_size, seq_length, hidden_size)
         out = F.relu(self.fc1(out))
-        out = self.fc2(out)
-        out = out.view(-1, 2)
-        return out
-
+        if cfg.model.model_mode == 1:
+            return out
+        elif cfg.model.model_mode == 2:
+            out = self.fc2(out)
+            out = out.view(-1, 2)
+            return out
 
 class LGSS(nn.Module):
     def __init__(self, cfg):
@@ -159,30 +181,79 @@ class LGSS(nn.Module):
         self.num_layers = cfg.model.num_layers
         self.lstm_hidden_size = cfg.model.lstm_hidden_size
         self.ratio = cfg.model.ratio
+        self.channel = 0
         if 'place' in self.mode:
             self.bnet_place = LGSSone(cfg, "place")
-        if 'cast' in self.mode:
-            self.bnet_cast = LGSSone(cfg, "cast")
+            self.channel += 1
+        if 'vit' in self.mode:
+            self.bnet_vit = LGSSone(cfg, "vit")
+            self.channel += 1
         if 'act' in self.mode:
             self.bnet_act = LGSSone(cfg, "act")
+            self.channel += 1
         if 'aud' in self.mode:
             self.bnet_aud = LGSSone(cfg, "aud")
+            self.channel += 1
+        self.cfg = cfg
+        self.se_layer = SELayer(self.channel * 8, self.cfg.model.reduction)
+        self.fc = nn.Linear(self.channel * 128, 2)
 
-    def forward(self, place_feat, cast_feat, act_feat, aud_feat):
-        out = 0
-        if 'place' in self.mode:
-            place_bound = self.bnet_place(place_feat)
-            out += self.ratio[0]*place_bound
-        if 'cast' in self.mode:
-            cast_bound = self.bnet_cast(cast_feat)
-            out += self.ratio[1]*cast_bound
-        if 'act' in self.mode:
-            act_bound = self.bnet_act(act_feat)
-            out += self.ratio[2]*act_bound
-        if 'aud' in self.mode:
-            aud_bound = self.bnet_aud(aud_feat)
-            out += self.ratio[3]*aud_bound
-        return out
+    def forward(self, place_feat, vit_feat, act_feat, aud_feat):
+        if self.cfg.se_layer:
+        outs = {}
+        if cfg.model.model_mode == 1:
+            out = 0
+            if 'place' in self.mode:
+                place_bound = self.bnet_place(place_feat)
+                out += self.ratio[0] * place_bound
+                outs['place'] = place_bound
+            if 'vit' in self.mode:
+                cvit_bound = self.bnet_vit(vit_feat)
+                out += self.ratio[1] * vit_bound
+                outs['vit'] = vit_bound
+            if 'act' in self.mode:
+                act_bound = self.bnet_act(act_feat)
+                out += self.ratio[2] * act_bound
+                outs['act'] = act_bound
+            if 'aud' in self.mode:
+                aud_bound = self.bnet_aud(aud_feat)
+                out += self.ratio[3] * aud_bound
+                outs['aud'] = aud_bound
+            outs['fusion'] = out
+            return outs
+        elif cfg.model.model_mode == 2:
+            inputs = []
+            if 'place' in self.mode:
+                inputs.append(self.bnet_place(place_feat))
+            if 'vit' in self.mode:
+                inputs.append(self.bnet_vit(vit_feat))
+            if 'act' in self.mode:
+                inputs.append(self.bnet_act(act_feat))
+            if 'aud' in self.mode:
+                inputs.append(self.bnet_aud(aud_feat))
+            inputs = torch.stack(inputs, axis = 1).view(-1, self.channel * 8, 4, 4)
+            out = self.se_layer(inputs)
+            out = self.fc(out.view(-1, self.channel * 128))
+            outs['fusion'] = out
+            return outs
+        return outs
+
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
 
 
 if __name__ == '__main__':
@@ -190,12 +261,12 @@ if __name__ == '__main__':
     cfg = Config.fromfile("../config/train_hsv.py")
     model = LGSS(cfg)
     place_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 2048)
-    cast_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 512)
+    vit_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 768)
     act_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 512)
     aud_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 257, 90)
     target = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 1)
     print(target.shape, target.view(-1).shape)
-    output = model(place_feat, cast_feat, act_feat, aud_feat)
+    output = model(place_feat, vit_feat, act_feat, aud_feat)
     print(output.shape)
     print(cfg.batch_size)
     print(output.data.size())

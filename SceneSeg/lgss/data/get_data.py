@@ -8,17 +8,6 @@ from lgss.utils.package import *
 import cv2
 import tqdm
 
-normalizer = transforms.Normalize(
-    mean=[0.485, 0.456, 0.406],
-    std=[0.229, 0.224, 0.225])
-
-transformer = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    normalizer])
-
-
 class Preprocessor(data.Dataset):
     def __init__(self, cfg, listIDs, data_dict):
         self.cfg = cfg
@@ -29,7 +18,6 @@ class Preprocessor(data.Dataset):
         self.data_root = cfg.data_root
         self.shot_boundary_range = range(-cfg.shot_num // 2 + 1, cfg.shot_num // 2 + 1)
         self.mode = cfg.dataset.mode
-        self.transform = transformer
         assert (len(self.mode) > 0)
         self.data_dict = data_dict
         self.fps_dict = {}
@@ -65,11 +53,11 @@ class Preprocessor(data.Dataset):
     def __getitem__(self, index):
         ID_list = self.listIDs[index]
         if isinstance(ID_list, (tuple, list)):
-            place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids = [], [], [], [], [], [], [], [], []
+            place_feats, vit_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids = [], [], [], [], [], [], [], [], []
             for ID in ID_list:
-                place_feat, cast_feat, act_feat, aud_feat, label, end_frame, video_id, shot_id, end_shotid = self._get_single_item(ID)
+                place_feat, vit_feat, act_feat, aud_feat, label, end_frame, video_id, shot_id, end_shotid = self._get_single_item(ID)
                 place_feats.append(place_feat)
-                cast_feats.append(cast_feat)
+                vit_feats.append(vit_feat)
                 act_feats.append(act_feat)
                 aud_feats.append(aud_feat)
                 labels.append(label)
@@ -79,8 +67,8 @@ class Preprocessor(data.Dataset):
                 end_shotids.append(end_shotid)
             if 'place' in self.mode:
                 place_feats = torch.stack(place_feats)
-            if 'cast' in self.mode:
-                cast_feats = torch.stack(cast_feats)
+            if 'vit' in self.mode:
+                vit_feats = torch.stack(vit_feats)
             if 'act' in self.mode:
                 act_feats = torch.stack(act_feats)
             if 'aud' in self.mode:
@@ -88,23 +76,9 @@ class Preprocessor(data.Dataset):
             labels = np.array(labels)
             end_frames = np.array(end_frames)
             video_ids = video_ids
-            return place_feats, cast_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids
+            return place_feats, vit_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids
         else:
             return self._get_single_item(ID_list)
-        '''
-        if isinstance(ID_list, (tuple, list)):
-            imgs, cast_feats, act_feats, aud_feats, labels = [], [], [], [], []
-            for ID in ID_list:
-                img, label = self._get_single_item(ID)
-                imgs.append(img)
-                labels.append(label)
-            if 'image' in self.mode:
-                imgs = torch.stack(imgs)
-            labels = np.array(labels)
-            return imgs, cast_feats, act_feats, aud_feats, labels
-        else:
-            return self._get_single_item(ID_list)
-        '''
 
     # 得到单条样本
     def _get_single_item(self, ID):
@@ -116,7 +90,9 @@ class Preprocessor(data.Dataset):
         end_shot = int(ID['endshot'])
         #得到该video的最后一个frame
         end_frame = self.shot_frames[self.gen_key(imdbid, ID['endshot'])][1]
-        if int(shotid) <= end_shot:
+        if int(shotid) < 0:
+            end_frame = self.shot_frames[self.gen_key(imdbid, strcal(0, 0))][1]
+        elif int(shotid) <= end_shot:
             end_frame = self.shot_frames[self.gen_key(imdbid, shotid)][1]
         #得到该shot对应的label
         label = 0
@@ -127,39 +103,27 @@ class Preprocessor(data.Dataset):
             elif int(shotid) > end_shot:
                 label = self.data_dict["annos_dict"].get(imdbid).get(strcal(end_shot, 0), 0)
         #得到该shot对应feats
-        aud_feats, place_feats = [], []
-        cast_feats, act_feats = [], []
+        aud_feats = []
+        place_feats = []
+        vit_feats = []
+        act_feats = []
         if 'place' in self.mode:
             for ind in self.shot_boundary_range:
-                if int(shotid) + ind < 0:
-                    name = 'shot_0000.npy'
-                elif int(shotid) + ind > end_shot:
-                    name = 'shot_{}.npy'.format(str(end_shot).zfill(4))
-                else:
-                    name = 'shot_{}.npy'.format(strcal(shotid, ind))
-                path = osp.join(self.data_root, 'place_feat/{}'.format(imdbid), name)
-                place_feat = np.load(path)
+                name = self.get_feat_name(shotid, ind, end_shot)
+                path = osp.join(self.data_root, '{}/{}'.format(self.cfg.place_base, imdbid), name)
+                place_feat = np.load(path, allow_pickle=True)
                 place_feats.append(torch.from_numpy(place_feat).float())
-        if 'cast' in self.mode:
+        if 'vit' in self.mode:
             for ind in self.shot_boundary_range:
-                cast_feat_raw = self.data_dict["casts_dict"].get(imdbid).get(strcal(shotid, ind))
-                cast_feat = np.mean(cast_feat_raw, axis=0)
-                cast_feats.append(torch.from_numpy(cast_feat).float())
-        if 'act' in self.mode:
-            for ind in self.shot_boundary_range:
-                act_feat = self.data_dict["acts_dict"].get(imdbid).get(strcal(shotid, ind))
-                act_feats.append(torch.from_numpy(act_feat).float())
+                name = self.get_feat_name(shotid, ind, end_shot)
+                path = osp.join(self.data_root, '{}/{}'.format(self.cfg.vit_base, imdbid), name)
+                vit_feat = np.load(path, allow_pickle=True)
+                vit_feats.append(torch.from_numpy(vit_feat).float())
         if 'aud' in self.mode:
             for ind in self.shot_boundary_range:
-                if int(shotid) + ind < 0:
-                    name = 'shot_0000.npy'
-                elif int(shotid) + ind > end_shot:
-                    name = 'shot_{}.npy'.format(str(end_shot).zfill(4))
-                else:
-                    name = 'shot_{}.npy'.format(strcal(shotid, ind))
+                name = self.get_feat_name(shotid, ind, end_shot)
                 try:
-                    path = osp.join(
-                        self.data_root, 'aud_feat/{}'.format(imdbid), name)
+                    path = osp.join(self.data_root, '{}/{}'.format(self.cfg.aud_baseimdbid), name)
                     aud_feat = np.load(path)
                     aud_feats.append(torch.from_numpy(aud_feat).float())
                 except Exception as e:
@@ -167,20 +131,29 @@ class Preprocessor(data.Dataset):
 
         if len(place_feats) > 0:
             place_feats = torch.stack(place_feats)
-        if len(cast_feats) > 0:
-            cast_feats = torch.stack(cast_feats)
+        if len(vit_feats) > 0:
+            vit_feats = torch.stack(vit_feats)
         if len(act_feats) > 0:
             act_feats = torch.stack(act_feats)
         if len(aud_feats) > 0:
             aud_feats = torch.stack(aud_feats)
-        return place_feats, cast_feats, act_feats, aud_feats, label, end_frame, imdbid, int(shotid), end_shot
+        return place_feats, vit_feats, act_feats, aud_feats, label, end_frame, imdbid, int(shotid), end_shot
+
+    def get_feat_name(self, shotid, ind, end_shot):
+        if int(shotid) + ind < 0:
+            name = 'shot_0000.npy'
+        elif int(shotid) + ind > end_shot:
+            name = 'shot_{}.npy'.format(str(end_shot).zfill(4))
+        else:
+            name = 'shot_{}.npy'.format(strcal(shotid, ind))
+
 
 def get_train_data(cfg):
     print('start data pre')
-    imdbidlist_json, annos_dict, annos_valid_dict, casts_dict, acts_dict = train_data_utils.data_pre(cfg)
+    imdbidlist_json, annos_dict, annos_valid_dict, vits_dict, acts_dict = train_data_utils.data_pre(cfg)
     print('start data partition')
     partition = train_data_utils.data_partition(cfg, imdbidlist_json, annos_valid_dict)
-    data_dict = {"annos_dict": annos_dict, "casts_dict": casts_dict, "acts_dict": acts_dict}
+    data_dict = {"annos_dict": annos_dict, "vits_dict": vits_dict, "acts_dict": acts_dict}
     print('start train data pre process')
     train_data = Preprocessor(cfg, partition['train'], data_dict)
     print('start val data pre process')

@@ -20,11 +20,12 @@ def data_partition(cfg, imdbidlist_json, annos_dict):
                 new_len = (len(shotid_list) // cfg.seq_len + 1) * cfg.seq_len
                 padding_left = (new_len - len(shotid_list)) // 2
                 padding_right = new_len - len(shotid_list) - padding_left
-                shotid_list = [-1] * padding_left + shotid_list + [shotid_list[-1]] * padding_right
+                shotid_list = [strcal(-1, 0)] * padding_left + shotid_list + [strcal(int(shotid_list[-1]) + 1, 0)] * padding_right
             for i in range(len(shotid_list) // cfg.seq_len):
                 one_idxs = []
                 for j in range(cfg.seq_len):
-                    one_idxs.append({'imdbid': imdbid, 'shotid': strcal(cfg.seq_len * i, j), "endshot": end_shot})
+                    #one_idxs.append({'imdbid': imdbid, 'shotid': strcal(cfg.seq_len * i, j), "endshot": end_shot})
+                    one_idxs.append({'imdbid': imdbid, 'shotid': shotid_list[cfg.seq_len * i + j], "endshot": end_shot})
                 one_mode_idxs.append(one_idxs)
             '''    
             shotid_tmp = 0
