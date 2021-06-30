@@ -15,7 +15,7 @@ aud_base = 'aud_feat'
 
 dataset = dict(
     name="train",
-    mode=['place', 'vit', 'aud'],
+    mode=['place', 'aud'],
 )
 
 model = dict(
@@ -29,9 +29,11 @@ model = dict(
     aud = dict(cos_channel = 512),
     bidirectional = True,
     lstm_hidden_size = 512,
-    ratio = [0.8, 0.8, 0, 0.4],
+    ratio = [0, 0.8, 0, 0.4],
     num_layers = 2,
-    reduction = 4,
+    reduction = 16,
+    dropout_ratio = 0.5,
+    se_dim = 128,
     )
 
 optim = dict(name = 'Adam',

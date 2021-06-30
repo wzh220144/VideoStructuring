@@ -78,7 +78,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_gpu', type=int, default=1)
     parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/train_5k_A/shot_hsv")
     parser.add_argument('--batch-size', type=int, default=128)
-    parser.add_argument('--keyf_num', type=int, default=2)
+    parser.add_argument('--keyf_num', type=int, default=0)
     args = parser.parse_args()
     args.list_file = None
     args.source_img_path = osp.join(args.data_root, 'shot_keyf')

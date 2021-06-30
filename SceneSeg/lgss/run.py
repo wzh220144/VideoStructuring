@@ -51,7 +51,8 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
         target = target.view(-1).cuda()
         #print(len(target))
         optimizer.zero_grad()
-        output = model(data_place, data_vit, data_act, data_aud)
+        outs = model(data_place, data_vit, data_act, data_aud)
+        output = outs['fusion']
         output = output.view(-1, 2)
         loss = criterion(output, target)
         loss.backward()
@@ -111,17 +112,17 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
 def test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, epoch):
     global fps_dict
     print('start val...')
-    res, total_loss = lgss_util.inference(cfg, args, model, val_loader, criterion)
+    res = lgss_util.inference(cfg, args, model, val_loader, criterion)
 
     cur_max_threshold = -1
     cur_max_f1 = 0
     is_best = False
     cur_max_ap = 0
     for threshold in np.arange(0, 1.01, 0.01).tolist():
-        auc, acc, recall, precision, ap, f1, avg_loss, f1_w = lgss_util.val(cfg, res, threshold, total_loss, args, fps_dict)
-        print(
-            'threshold: {}, auc: {}, acc: {}, recall: {}, precision: {}, ap: {}, f1: {}, avg_loss: {}, f1_w: {}'.format(
-                threshold, auc, acc, recall, precision, ap, f1, avg_loss, f1_w))
+        t = lgss_util.val(cfg, res, threshold, args, fps_dict)
+        print('{}: {}'.format(threshold, json.dumps(t)))
+        f1_w = t['fusion']['f1_w']
+        ap = t['fusion']['ap']
         if f1_w > best_f1:
             is_best = True
             best_f1 = f1_w
@@ -140,7 +141,7 @@ def test(cfg, model, val_loader, best_f1, best_ap, best_threshold, criterion, ep
             cur_max_f1, best_f1, cur_max_ap, best_ap))
 
     state_dict = model.module.state_dict()
-    save_checkpoint({'state_dict': state_dict, 'epoch': epoch + 1, 'f1': cur_max_f1, 'threshold': cur_max_threshold, 'ap': ap}, is_best, epoch + 1, cfg.model_path)
+    save_checkpoint({'state_dict': state_dict, 'epoch': epoch, 'f1': cur_max_f1, 'threshold': cur_max_threshold, 'ap': ap}, is_best, epoch + 1, cfg.model_path)
     return best_f1, best_ap, best_threshold
 
 def main():

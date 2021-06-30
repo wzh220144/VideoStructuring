@@ -11,58 +11,83 @@ import sklearn
 import sklearn.metrics
 
 def _inference(cfg, args, model, criterion, data_place, data_vit, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids):
-    total_loss = 0
     data_place = data_place.cuda() if 'place' in cfg.dataset.mode else []
     data_vit = data_vit.cuda() if 'vit' in cfg.dataset.mode else []
     data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
     data_aud = data_aud.cuda() if 'aud' in cfg.dataset.mode else []
     target = target.view(-1).cuda()
-
-    output = model(data_place, data_vit, data_act, data_aud)
-    #print(data_place.shape, target.shape, output.shape)
-    output = output.view(-1, 2)
-    loss = criterion(output, target)
-
-    total_loss += loss.item()
-    output = F.softmax(output, dim=1)
-    prob = output[:, 1]
-    labels = to_numpy(target).tolist()
-    probs = to_numpy(prob)
-    end_frames = to_numpy(end_frames.view(-1)).tolist()
+    
     t1 = []
     t2 = []
     t3 = []
-    #print(video_ids, labels, probs, end_frames)
+    t4 = []
+
     for i in range(len(video_ids[0])):
         for j in range(len(video_ids)):
             t1.append(video_ids[j][i])
             t2.append(shot_ids[j][i])
             t3.append(end_shotids[j][i])
+            t4.append(end_frames[i][j])
     video_ids = t1
     shot_ids = t2
     end_shotids = t3
-    other = []
-    for i in range(len(labels)):
-        #print(labels[i], probs[i], end_frames[i], video_ids[i])
-        other.append((labels[i], probs[i], end_frames[i], video_ids[i], shot_ids[i], end_shotids[i]))
-    #print('')
-    return other, total_loss
+    end_frames = t4
+    
+    labels = to_numpy(target).tolist()
+    outs = model(data_place, data_vit, data_act, data_aud)
+    res = {'video_ids': video_ids,
+            'shot_ids': shot_ids,
+            'end_shotids': end_shotids,
+            'end_frames': end_frames,
+            'labels': labels}
+    for k, output in outs.items():
+        res[k] = {}
+        output = output.view(-1, 2)
+        loss = criterion(output, target)
+        res[k]['loss'] = loss.item()
+        output = F.softmax(output, dim=1)
+        prob = output[:, 1]
+        probs = to_numpy(prob).tolist()
+        res[k]['probs'] = probs
+    return res
 
 def inference(cfg, args, model, data_loader, criterion):
     model.eval()
-    res = []
-    total_loss = 0.0
+    res = {}
     with torch.no_grad():
-        for data_place, data_vit, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids in tqdm.tqdm(data_loader,
-                                                                                                  total=len(
-                                                                                                          data_loader), desc='inference'):
-            t, loss = _inference(cfg, args, model, criterion, data_place, data_vit, data_act, data_aud, target,
+        for data_place, data_vit, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids in tqdm.tqdm(data_loader, total=len(data_loader), desc='inference'):
+            t = _inference(cfg, args, model, criterion, data_place, data_vit, data_act, data_aud, target,
                                  end_frames, video_ids, shot_ids, end_shotids)
-            res.extend(t)
-            total_loss += loss
-    return res, total_loss
+            for k, v in t.items():
+                if k not in res:
+                    res[k] = v
+                else:
+                    if k == 'video_ids' or k == 'shot_ids' or k == 'end_shotids' or k == 'end_frames' or k == 'labels':
+                        res[k].extend(v)
+                    else:
+                        res[k]['loss'] += v['loss']
+                        res[k]['probs'].extend(v['probs'])
 
-def val(cfg, res, threshold, total_loss, args, fps_dict, topn = -1, smooth_threshold = 0.1):
+    return res
+
+def val(cfg, res, threshold, args, fps_dict):
+    t = {}
+    for mode in cfg.dataset.mode + ['fusion']:
+        t_res = []
+        for index in range(len(res['video_ids'])):
+            t_res.append([
+                res['labels'][index], 
+                res[mode]['probs'][index], 
+                res['end_frames'][index],
+                res['video_ids'][index],
+                res['shot_ids'][index],
+                res['end_shotids'][index],
+                ])
+        t[mode] = _val(cfg, t_res, threshold, res[mode]['loss'], args, fps_dict)
+    return t
+
+
+def _val(cfg, res, threshold, total_loss, args, fps_dict):
     probs = [x[1] for x in res]
     predicts = [1 if x[1] >= threshold else 0 for x in res]
     labels = [x[0] for x in res]
@@ -155,5 +180,4 @@ def val(cfg, res, threshold, total_loss, args, fps_dict, topn = -1, smooth_thres
     f1_w = 0
     if t1 + t2 > 0:
         f1_w = 2 * t1 * t2 / (t1 + t2)
-    print(tp, pt, rt)
-    return auc, acc, recall, precision, ap, f1, avg_loss, f1_w
+    return {'auc': auc, 'acc': acc, 'recall': recall, 'precision': precision, 'ap': ap, 'f1': f1, 'avg_loss': avg_loss, 'f1_w': f1_w}

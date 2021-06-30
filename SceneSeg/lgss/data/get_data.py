@@ -123,7 +123,7 @@ class Preprocessor(data.Dataset):
             for ind in self.shot_boundary_range:
                 name = self.get_feat_name(shotid, ind, end_shot)
                 try:
-                    path = osp.join(self.data_root, '{}/{}'.format(self.cfg.aud_baseimdbid), name)
+                    path = osp.join(self.data_root, '{}/{}'.format(self.cfg.aud_base, imdbid), name)
                     aud_feat = np.load(path)
                     aud_feats.append(torch.from_numpy(aud_feat).float())
                 except Exception as e:
@@ -140,12 +140,14 @@ class Preprocessor(data.Dataset):
         return place_feats, vit_feats, act_feats, aud_feats, label, end_frame, imdbid, int(shotid), end_shot
 
     def get_feat_name(self, shotid, ind, end_shot):
+        name = ''
         if int(shotid) + ind < 0:
             name = 'shot_0000.npy'
         elif int(shotid) + ind > end_shot:
             name = 'shot_{}.npy'.format(str(end_shot).zfill(4))
         else:
             name = 'shot_{}.npy'.format(strcal(shotid, ind))
+        return name
 
 
 def get_train_data(cfg):

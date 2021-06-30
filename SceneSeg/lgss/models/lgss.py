@@ -147,16 +147,9 @@ class LGSSone(nn.Module):
                             bidirectional=cfg.model.bidirectional)
 
         if cfg.model.bidirectional:
-            if cfg.model.model_mode == 1:
-                self.fc1 = nn.Linear(self.lstm_hidden_size, 100)
-            elif cfg.model.model_mode == 2:
-                self.fc1 = nn.Linear(self.lstm_hidden_size, 128)
+            self.fc1 = nn.Linear(self.lstm_hidden_size * 2, 100)
         else:
-            if cfg.model.model_mode == 1:
-                self.fc1 = nn.Linear(self.lstm_hidden_size, 100)
-            elif cfg.model.model_mode == 2:
-                self.fc1 = nn.Linear(self.lstm_hidden_size, 128)
-
+            self.fc1 = nn.Linear(self.lstm_hidden_size, 100)
         self.fc2 = nn.Linear(100, 2)
         self.cfg = cfg
 
@@ -166,49 +159,54 @@ class LGSSone(nn.Module):
         x = x.view(-1, self.seq_len, x.shape[-1])
         out, (_, _) = self.lstm(x, None)
         out = F.relu(self.fc1(out))
-        if cfg.model.model_mode == 1:
-            return out
-        elif cfg.model.model_mode == 2:
+        if self.cfg.model.model_mode == 1:
             out = self.fc2(out)
             out = out.view(-1, 2)
-            return out
-
+        elif self.cfg.model.model_mode == 2:
+            pass
+        return out
+            
 class LGSS(nn.Module):
     def __init__(self, cfg):
         super(LGSS, self).__init__()
+        self.cfg = cfg
         self.seq_len = cfg.seq_len
         self.mode = cfg.dataset.mode
         self.num_layers = cfg.model.num_layers
         self.lstm_hidden_size = cfg.model.lstm_hidden_size
         self.ratio = cfg.model.ratio
-        self.channel = 0
+        self.classify_head = {}
+        self.dim = 0
         if 'place' in self.mode:
             self.bnet_place = LGSSone(cfg, "place")
-            self.channel += 1
+            self.dim += 100
         if 'vit' in self.mode:
             self.bnet_vit = LGSSone(cfg, "vit")
-            self.channel += 1
+            self.dim += 100
         if 'act' in self.mode:
             self.bnet_act = LGSSone(cfg, "act")
-            self.channel += 1
+            self.dim += 100
         if 'aud' in self.mode:
             self.bnet_aud = LGSSone(cfg, "aud")
-            self.channel += 1
-        self.cfg = cfg
-        self.se_layer = SELayer(self.channel * 8, self.cfg.model.reduction)
-        self.fc = nn.Linear(self.channel * 128, 2)
+            self.dim += 100
+        self.se_classify_head = nn.Linear(self.cfg.model.se_dim, 2)
+        self.se_layer = SELayer(self.cfg, self.dim, self.cfg.model.reduction)
+
+    def _classify(self, classify_layer, x):
+        out = classify_layer(x)
+        out = x.view(-1, 2)
+        return out
 
     def forward(self, place_feat, vit_feat, act_feat, aud_feat):
-        if self.cfg.se_layer:
         outs = {}
-        if cfg.model.model_mode == 1:
+        if self.cfg.model.model_mode == 1:  #简单线性加权融合
             out = 0
             if 'place' in self.mode:
                 place_bound = self.bnet_place(place_feat)
                 out += self.ratio[0] * place_bound
                 outs['place'] = place_bound
             if 'vit' in self.mode:
-                cvit_bound = self.bnet_vit(vit_feat)
+                vit_bound = self.bnet_vit(vit_feat)
                 out += self.ratio[1] * vit_bound
                 outs['vit'] = vit_bound
             if 'act' in self.mode:
@@ -220,41 +218,51 @@ class LGSS(nn.Module):
                 out += self.ratio[3] * aud_bound
                 outs['aud'] = aud_bound
             outs['fusion'] = out
-            return outs
-        elif cfg.model.model_mode == 2:
+        elif self.cfg.model.model_mode == 2:    #se融合
             inputs = []
             if 'place' in self.mode:
-                inputs.append(self.bnet_place(place_feat))
+                place_bound = self.bnet_place(place_feat)
+                inputs.append(place_bound)
             if 'vit' in self.mode:
-                inputs.append(self.bnet_vit(vit_feat))
+                vit_bound = self.bnet_vit(vit_feat)
+                inputs.append(vit_bound)
             if 'act' in self.mode:
-                inputs.append(self.bnet_act(act_feat))
+                act_bound = self.bnet_act(act_feat)
+                inputs.append(act_bound)
             if 'aud' in self.mode:
-                inputs.append(self.bnet_aud(aud_feat))
-            inputs = torch.stack(inputs, axis = 1).view(-1, self.channel * 8, 4, 4)
+                aud_bound = self.bnet_aud(aud_feat)
+                inputs.append(aud_bound)
+            inputs = torch.concat(inputs, axis = 1)
             out = self.se_layer(inputs)
-            out = self.fc(out.view(-1, self.channel * 128))
+            out = self._classify(self.se_classify_head, out)
             outs['fusion'] = out
-            return outs
         return outs
 
 class SELayer(nn.Module):
-    def __init__(self, channel, reduction=16):
+    def __init__(self, cfg, input_dim, reduction):
         super(SELayer, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False),
-            nn.Sigmoid()
-        )
+        self.cfg = cfg
+        if self.cfg.model.dropout_ratio > 0:
+            self.dropout = nn.Dropout(p=self.cfg.model.dropout_ratio)
+        self.input_dim = input_dim
+        self.fc1 = nn.Linear(self.input_dim, self.cfg.model.se_dim)
+        self.bn1 = nn.BatchNorm1d(self.cfg.model.se_dim)
+        self.fc2 = nn.Linear(self.cfg.model.se_dim, self.cfg.model.se_dim // reduction)
+        self.bn2 = nn.BatchNorm1d(self.cfg.model.se_dim // reduction)
+        self.fc3 = nn.Linear(self.cfg.model.se_dim // reduction, self.cfg.model.se_dim)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        b, c, _, _ = x.size()
-        y = self.avg_pool(x).view(b, c)
-        y = self.fc(y).view(b, c, 1, 1)
-        return x * y.expand_as(x)
-
+        out = x
+        if self.cfg.dropout_ratio > 0:
+            out = self.dropout(out)
+        out = self.fc1(out)
+        out = self.bn1(out)
+        out = self.fc2(out)
+        out = self.bn2(out)
+        out = self.fc3(out)
+        out = self.sigmoid(out)
+        return x * out
 
 if __name__ == '__main__':
     from mmcv import Config

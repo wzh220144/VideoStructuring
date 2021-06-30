@@ -27,7 +27,9 @@ def load_model(cfg, args, use_best = True):
         checkpoint = load_checkpoint(cfg.model_path + '/checkpoint.pth.tar', args.use_gpu)
     model.load_state_dict(checkpoint['state_dict'], strict=False)
     threshold = checkpoint['threshold']
-    print('threshold: {}'.format(threshold))
+    f1 = checkpoint['f1']
+    ap = checkpoint['ap']
+    print('threshold: {}, f1: {}, ap: {}'.format(threshold, f1, ap))
     if args.use_gpu == 1:
         model = nn.DataParallel(model)
     return model, threshold
@@ -85,14 +87,14 @@ if __name__ == '__main__':
     data_loader = DataLoader(data, batch_size=cfg.batch_size, shuffle=False, **cfg.data_loader_kwargs)
 
     criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
-    inference_res, total_loss = lgss_util.inference(cfg, args, model, data_loader, criterion)
-    for x in inference_res:
-        label = x[0]
-        prob = x[1]
-        end_frame = x[2]
-        video_name = x[3]
-        shot_id = x[4]
-        end_shotid = x[5]
+    inference_res = lgss_util.inference(cfg, args, model, data_loader, criterion)
+    for index in range(len(inference_res['video_ids'])):
+        label = inference_res['labels'][index]
+        prob = inference_res['fusion']['probs'][index]
+        end_frame = inference_res['end_frames'][index]
+        video_name = inference_res['video_ids'][index]
+        shot_id = inference_res['shot_ids'][index]
+        end_shotid = inference_res['end_shotids'][index]
         #过滤填充id
         if shot_id > end_shotid:
             continue
@@ -100,10 +102,10 @@ if __name__ == '__main__':
             continue
         if video_name not in video_inference_res:
             video_inference_res[video_name] = {}
-        k = str(end_frame)
+        k = str(end_frame.item())
         if k not in video_inference_res[video_name]:
-            video_inference_res[video_name][k] = {'prob': prob.item(), 'label': label}
-        video_inference_res[video_name][k]['prob'] = max(video_inference_res[video_name][k]['prob'], prob.item())
+            video_inference_res[video_name][k] = {'prob': prob, 'label': label}
+        video_inference_res[video_name][k]['prob'] = max(video_inference_res[video_name][k]['prob'], prob)
     os.makedirs(os.path.join(cfg.data_root, "seg_results"), exist_ok=True)
     
     for video_name, value in video_inference_res.items():
