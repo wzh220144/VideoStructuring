@@ -4,7 +4,6 @@ import os
 import json
 
 class Preprocess:
-
     def __init__(self, vocab, max_len, is_training=False):
         self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab)
         self.max_len = max_len
@@ -12,10 +11,19 @@ class Preprocess:
 
     def __call__(self, text_path):
         text = ""
-        if os.path.exists(text_path):
-            with open(text_path, 'r') as f:
-                obj = json.load(f)
-                text = obj['video_ocr'] + obj['video_asr']
+        cols = text_path.split('/')[:-2]
+        vid = text_path.split('/')[-1]
+        asr_path = '/'.join(cols + ['asr_txt', vid])
+        ocr_path = '/'.join(cols + ['ocr_txt', vid])
+
+        if os.path.exists(asr_text):
+            with open(asr_path, 'r') as f:
+                for line in f:
+                    text += ' ' + line.strip('\n')
+        if os.path.exists(ocr_text):
+            with open(ocr_path, 'r') as f:
+                for line in f:
+                    text += ' ' + line.strip('\n')
         tokens = ['[CLS]'] + self.tokenizer.tokenize(text)
         ids = self.tokenizer.convert_tokens_to_ids(tokens)
         ids = ids[:self.max_len]
