@@ -22,9 +22,14 @@ model = dict(
     name='LGSS',
     model_mode = 2,
     sim_channel = 512,  # dim of similarity vector
-    place_feat_input_dim = 2048,
-    place_feat_frame_num = 5,
-    place_feat_dim = 2048,
+    place = dict(
+        feature_size = 2048,
+        frame = 4,
+        output_dim = 2048,
+        group = 16,
+        expansion = 2,
+        nextvlad_cluster_size = 128,
+        ),
     vit_feat_dim = 768,
     act_feat_dim = 512,
     aud_feat_dim = 512,

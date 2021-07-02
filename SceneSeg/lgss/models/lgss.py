@@ -20,6 +20,7 @@ import pdb
 
 class NeXtVLAD(nn.Module):
     def __init__(self, cfg, feature_size, frame, group, expansion, nextvlad_cluster_size):
+        super(NeXtVLAD, self).__init__()
         self.cfg = cfg
         self.feature_size = feature_size
         self.frame = frame
@@ -27,34 +28,35 @@ class NeXtVLAD(nn.Module):
         self.expansion = expansion
         self.nextvlad_cluster_size = nextvlad_cluster_size
         self.fc1 = nn.Linear(feature_size, expansion * feature_size)
-        self.attention = nn.Linear(feature_size, group)
+        self.attention = nn.Linear(expansion * feature_size, group)
         self.fc2 = nn.Linear(expansion * feature_size, group * nextvlad_cluster_size)
-        self.bn1 = nn.BatchNorm2d(cfg.seq_len)
-        self.fc3 = nn.Linear()
+        self.bn1 = nn.BatchNorm1d(group * nextvlad_cluster_size)
         self.new_feature_size = expansion * feature_size // group
-        self.cluster_weights = torch.empty(1, self.new_feature_size, nextvlad_cluster_size)
+        self.cluster_weights = torch.empty(1, self.new_feature_size, nextvlad_cluster_size).cuda()
         nn.init.kaiming_normal_(self.cluster_weights, mode='fan_out', nonlinearity='relu')
         self.bn2 = nn.BatchNorm1d(self.nextvlad_cluster_size * self.new_feature_size)
 
     def forward(self, x):
-        out = self.fc1(x)
+        print(x.shape)
+        x = self.fc1(x)
         attention = F.sigmoid(self.attention(x)).view(-1, self.frame * self.group, 1)
-
-        reshpae_x = x.view(-1, self.expansion * self.feature_size)
-        activation = self.bn1(self.fc2(reshape_x)).view(-1, self.frame * self.group, self.nextvlad_cluster_size)
+        reshape_x = x.view(-1, self.expansion * self.feature_size)
+        t1 = self.fc2(reshape_x)
+        print(t1.shape)
+        t2 = self.bn1(t1)
+        activation = t2.view(-1, self.frame * self.group, self.nextvlad_cluster_size)
         activation = F.softmax(activation, -1)
-        activation = torch.multiply(activation, action)
-        a_sum = torch.sum(activation, -2, keep_dim = True)
+        activation = torch.multiply(activation, attention)
+        a_sum = torch.sum(activation, dim=-2, keepdim = True)
         a = torch.multiply(a_sum, self.cluster_weights)
-        activation = a.permute(0, 2, 1)
-
-        reshaped_x = x.view(-1, self.frame * self.group, self.new_feature_size])
-        vlad = torch.matmul(activation, reshaped_x).permut(0, 2, 1)
-        vlad = torch.sub(vald, )
-        vlad = tf.subtract(vlad, a)
+        activation = activation.permute(0, 2, 1)
+        reshaped_x = x.view(-1, self.frame * self.group, self.new_feature_size)
+        vlad = torch.matmul(activation, reshaped_x).permute(0, 2, 1)
+        vlad = torch.sub(vlad, a)
         vlad = F.normalize(vlad, 2, 1)
-        vlad = vlad.view(-1, self.nextvlad_cluster_size * self.new_feature_size)
+        vlad = vlad.contiguous().view(-1, self.nextvlad_cluster_size * self.new_feature_size)
         vlad = self.bn2(vlad)
+        #return vlad.view(-1, self.cfg.seq_len, self.nextvlad_cluster_size)
         return vlad
 
 class AudNet(nn.Module):
@@ -162,18 +164,21 @@ class BNetAud(nn.Module):
 class LGSSone(nn.Module):
     def __init__(self, cfg, mode="place"):
         super(LGSSone, self).__init__()
+        self.mode = mode
         self.seq_len = cfg.seq_len
         self.num_layers = cfg.model.num_layers
         self.lstm_hidden_size = cfg.model.lstm_hidden_size
         if mode == "place":
-            self.input_dim = (cfg.model.place_feat_dim+cfg.model.sim_channel)
-            self.bnet = BNet(cfg)
+            place = cfg.model.place
+            self.input_dim = (place.output_dim + cfg.model.sim_channel)
+            #self.bnet = BNet(cfg)
+            self.next_vlad = NeXtVLAD(cfg, place.feature_size, place.frame, place.group, place.expansion, place.nextvlad_cluster_size)
         elif mode == "vit":
             self.bnet = BNet(cfg)
-            self.input_dim = (cfg.model.vit_feat_dim+cfg.model.sim_channel)
+            self.input_dim = (cfg.model.vit_feat_dim + cfg.model.sim_channel)
         elif mode == "act":
             self.bnet = BNet(cfg)
-            self.input_dim = (cfg.model.act_feat_dim+cfg.model.sim_channel)
+            self.input_dim = (cfg.model.act_feat_dim + cfg.model.sim_channel)
         elif mode == "aud":
             self.bnet = BNetAud(cfg)
             self.input_dim = cfg.model.aud_feat_dim
@@ -194,8 +199,12 @@ class LGSSone(nn.Module):
 
     def forward(self, x):
         self.lstm.flatten_parameters()
-        x = self.bnet(x)
-        x = x.view(-1, self.seq_len, x.shape[-1])
+        if self.mode == 'place':
+            x = self.next_vlad(x)
+            print(x.shape)
+        else:
+            x = self.bnet(x)
+            x = x.view(-1, self.seq_len, x.shape[-1])
         out, (_, _) = self.lstm(x, None)
         out = F.relu(self.fc1(out))
         if self.cfg.model.model_mode == 1:
