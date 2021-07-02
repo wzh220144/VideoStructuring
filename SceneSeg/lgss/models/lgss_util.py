@@ -72,7 +72,12 @@ def inference(cfg, args, model, data_loader, criterion):
 
 def val(cfg, res, threshold, args, fps_dict):
     t = {}
-    for mode in cfg.dataset.mode + ['fusion']:
+    keys = []
+    if cfg.model.model_mode == 1:
+        keys = cfg.dataset.mode + ['fusion']
+    else:
+        keys = ['fusion']
+    for mode in keys:
         t_res = []
         for index in range(len(res['video_ids'])):
             t_res.append([

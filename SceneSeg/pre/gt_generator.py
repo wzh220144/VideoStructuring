@@ -50,6 +50,9 @@ def match_precise_shot_scene_boundary(save_dir, shot_dict, scene_dict, video_id_
     将与场景边界最近邻的shot boundary认为是转场
     """
     for video_id, scene_list in scene_dict.items():
+        if len(shot_dict.get(video_id, [])) == 0:
+            print("video id {} not in shot_dict".format(video_id))
+            continue
         positive_shots = set()
         shots = [x / video_id_fps_dict[video_id] for x in shot_dict[video_id]]
         scene_list = [x / video_id_fps_dict[video_id] for x in sorted(scene_list)]
@@ -65,7 +68,7 @@ def match_precise_shot_scene_boundary(save_dir, shot_dict, scene_dict, video_id_
                 else:
                     f.write("{} 0\n".format(str(i).zfill(4)))
 
- def match_shot_scene_boundary(save_dir, shot_dict, scene_dict):
+def match_shot_scene_boundary(save_dir, shot_dict, scene_dict):
     """
     将与场景边界最近邻的shot boundary认为是转场
     """
@@ -117,8 +120,8 @@ if __name__ == "__main__":
     
     save_label_dir = os.path.join(args.data_root, "labels")
     os.makedirs(save_label_dir, exist_ok = True)
-    #match_shot_scene_boundary(save_label_dir, shot_dict, scene_dict)
-    match_precise_shot_scene_boundary(save_label_dir, shot_dict, scene_dict, video_id_fps_dict)
+    match_shot_scene_boundary(save_label_dir, shot_dict, scene_dict)
+    #match_precise_shot_scene_boundary(save_label_dir, shot_dict, scene_dict, video_id_fps_dict)
 
 
     split_dict = {"train":[], "val":[], "all":[]}

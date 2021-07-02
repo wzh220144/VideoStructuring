@@ -20,8 +20,10 @@ dataset = dict(
 
 model = dict(
     name='LGSS',
-    model_mode = 1,
+    model_mode = 2,
     sim_channel = 512,  # dim of similarity vector
+    place_feat_input_dim = 2048,
+    place_feat_frame_num = 5,
     place_feat_dim = 2048,
     vit_feat_dim = 768,
     act_feat_dim = 512,
@@ -29,16 +31,16 @@ model = dict(
     aud = dict(cos_channel = 512),
     bidirectional = True,
     lstm_hidden_size = 512,
-    ratio = [0, 0.8, 0, 0.4],
-    num_layers = 2,
+    ratio = [0.8, 0, 0, 0.4],
+    num_layers = 1,
     reduction = 16,
     dropout_ratio = 0.5,
-    se_dim = 128,
+    se_dim = 64,
     )
 
 optim = dict(name = 'Adam',
              setting = dict(lr = 1e-3, weight_decay = 5e-4))
-stepper = dict(name='MultiStepLR', setting=dict(milestones = [15, 30, 40, 50], gamma = 0.1))
+stepper = dict(name='MultiStepLR', setting=dict(milestones = [20, 30, 40, 50], gamma = 0.1))
 loss = dict(weight=[0.5, 5])
 
 resume = None

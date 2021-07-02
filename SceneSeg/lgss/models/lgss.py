@@ -18,6 +18,45 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pdb
 
+class NeXtVLAD(nn.Module):
+    def __init__(self, cfg, feature_size, frame, group, expansion, nextvlad_cluster_size):
+        self.cfg = cfg
+        self.feature_size = feature_size
+        self.frame = frame
+        self.group = group
+        self.expansion = expansion
+        self.nextvlad_cluster_size = nextvlad_cluster_size
+        self.fc1 = nn.Linear(feature_size, expansion * feature_size)
+        self.attention = nn.Linear(feature_size, group)
+        self.fc2 = nn.Linear(expansion * feature_size, group * nextvlad_cluster_size)
+        self.bn1 = nn.BatchNorm2d(cfg.seq_len)
+        self.fc3 = nn.Linear()
+        self.new_feature_size = expansion * feature_size // group
+        self.cluster_weights = torch.empty(1, self.new_feature_size, nextvlad_cluster_size)
+        nn.init.kaiming_normal_(self.cluster_weights, mode='fan_out', nonlinearity='relu')
+        self.bn2 = nn.BatchNorm1d(self.nextvlad_cluster_size * self.new_feature_size)
+
+    def forward(self, x):
+        out = self.fc1(x)
+        attention = F.sigmoid(self.attention(x)).view(-1, self.frame * self.group, 1)
+
+        reshpae_x = x.view(-1, self.expansion * self.feature_size)
+        activation = self.bn1(self.fc2(reshape_x)).view(-1, self.frame * self.group, self.nextvlad_cluster_size)
+        activation = F.softmax(activation, -1)
+        activation = torch.multiply(activation, action)
+        a_sum = torch.sum(activation, -2, keep_dim = True)
+        a = torch.multiply(a_sum, self.cluster_weights)
+        activation = a.permute(0, 2, 1)
+
+        reshaped_x = x.view(-1, self.frame * self.group, self.new_feature_size])
+        vlad = torch.matmul(activation, reshaped_x).permut(0, 2, 1)
+        vlad = torch.sub(vald, )
+        vlad = tf.subtract(vlad, a)
+        vlad = F.normalize(vlad, 2, 1)
+        vlad = vlad.view(-1, self.nextvlad_cluster_size * self.new_feature_size)
+        vlad = self.bn2(vlad)
+        return vlad
+
 class AudNet(nn.Module):
     def __init__(self, cfg):
         super(AudNet, self).__init__()
@@ -194,7 +233,7 @@ class LGSS(nn.Module):
 
     def _classify(self, classify_layer, x):
         out = classify_layer(x)
-        out = x.view(-1, 2)
+        out = out.view(-1, 2)
         return out
 
     def forward(self, place_feat, vit_feat, act_feat, aud_feat):
@@ -232,7 +271,7 @@ class LGSS(nn.Module):
             if 'aud' in self.mode:
                 aud_bound = self.bnet_aud(aud_feat)
                 inputs.append(aud_bound)
-            inputs = torch.concat(inputs, axis = 1)
+            inputs = torch.cat(inputs, axis = 2)
             out = self.se_layer(inputs)
             out = self._classify(self.se_classify_head, out)
             outs['fusion'] = out
@@ -246,18 +285,17 @@ class SELayer(nn.Module):
             self.dropout = nn.Dropout(p=self.cfg.model.dropout_ratio)
         self.input_dim = input_dim
         self.fc1 = nn.Linear(self.input_dim, self.cfg.model.se_dim)
-        self.bn1 = nn.BatchNorm1d(self.cfg.model.se_dim)
+        self.bn1 = nn.BatchNorm1d(self.cfg.seq_len)
         self.fc2 = nn.Linear(self.cfg.model.se_dim, self.cfg.model.se_dim // reduction)
-        self.bn2 = nn.BatchNorm1d(self.cfg.model.se_dim // reduction)
+        self.bn2 = nn.BatchNorm1d(self.cfg.seq_len)
         self.fc3 = nn.Linear(self.cfg.model.se_dim // reduction, self.cfg.model.se_dim)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        out = x
-        if self.cfg.dropout_ratio > 0:
-            out = self.dropout(out)
-        out = self.fc1(out)
-        out = self.bn1(out)
+        if self.cfg.model.dropout_ratio > 0:
+            x = self.dropout(x)
+        x = self.fc1(x)
+        out = self.bn1(x)
         out = self.fc2(out)
         out = self.bn2(out)
         out = self.fc3(out)

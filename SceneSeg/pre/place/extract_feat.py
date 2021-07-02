@@ -28,11 +28,12 @@ import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 import pdb
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import tqdm
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
 
-os.environ["CUDA_VISIBLE_DEVICES"]='0'
+os.environ["CUDA_VISIBLE_DEVICES"]='0,1'
 
 resnet50_model_path = "/home/tione/notebook/VideoStructuring/pretrained/resnet50-19c8e357.pth"
 
@@ -78,9 +79,7 @@ class BasicBlock(nn.Module):
 
         out += identity
         out = self.relu(out)
-
         return out
-
 
 class Bottleneck(nn.Module):
     expansion = 4
@@ -190,46 +189,13 @@ class ResNet(nn.Module):
         # x = self.fc(x)
         return x
 
-'''
-def resnet50(pretrained=False, **kwargs):
-    """Constructs a ResNet-50 model.
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
-    model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
-    if pretrained:
-        model.load_state_dict(torch.load(resnet50_model_path), strict=False)
-    return model
-'''
-
 def to_numpy(tensor):
     if torch.is_tensor(tensor):
-        return tensor.cpu().numpy()
+        return tensor.cpu().detach().numpy()
     elif type(tensor).__module__ != 'numpy':
         raise ValueError("Cannot convert {} to numpy array"
                          .format(type(tensor)))
     return tensor
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
 
 class ResNet50(torch.nn.Module):
     def __init__(self, pretrained=True):
@@ -253,48 +219,39 @@ class Extractor(object):
         super(Extractor, self).__init__()
         self.model = model
         self.use_gpu = args.use_gpu
+        self.model.eval()
         # pprint(self.model.module)
 
-    def extract_feature(self, data_loader, print_summary=True):
-        self.model.eval()
-        batch_time = AverageMeter()
-        data_time = AverageMeter()
-
-        features = OrderedDict()
-        scores = OrderedDict()
-
-        end = time.time()
-        for i, (imgs, fnames) in enumerate(data_loader):
+    def extract_feature(self, data_loader):
+        pre_feat_path = ''
+        pre_num = -1
+        features = []
+        for imgs, feat_paths, nums in tqdm.tqdm(data_loader):
             if self.use_gpu == 1:
                 imgs = imgs.cuda()
-            data_time.update(time.time() - end)
             outputs = self.model(imgs)
-
-            for fname, feat, score in zip(fnames, outputs[0], outputs[1]):
-                features[fname] = feat.cpu().data
-                scores[fname] = score.cpu().data
-
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-            if print_summary:
-                print('Extract Features: [{}/{}]\t'
-                    'Time {:.3f} ({:.3f})\t'
-                    'Data {:.3f} ({:.3f})\t'
-                    .format(
-                        i + 1, len(data_loader),
-                        batch_time.val, batch_time.avg,
-                        data_time.val, data_time.avg))
-        return features, scores
-
+            for feat_path, num, feat, score in zip(feat_paths, nums, outputs[0], outputs[1]):
+                if feat_path != pre_feat_path:
+                    if len(features) > 0:
+                        t = '/'.join(pre_feat_path.split('/')[:-1])
+                        os.makedirs(t, exist_ok=True)
+                        np.save(pre_feat_path, np.stack(features, axis = 0))
+                    features = []
+                    pre_num = -1
+                if num != pre_num:
+                    features.append(to_numpy(feat.cpu()))
+                pre_num = num
+                pre_feat_path = feat_path
+        if len(features) > 0:
+            np.save(pre_feat_path, np.stack(features, axis = 0))
 
 class Preprocessor(object):
-    def __init__(self, dataset, images_path, default_size, transform=None):
+    def __init__(self, args, dataset, default_size, transform=None):
         super(Preprocessor, self).__init__()
         self.dataset = dataset
-        self.images_path = images_path
         self.transform = transform
         self.default_size = default_size
+        self.args = args
 
     def __len__(self):
         return len(self.dataset)
@@ -305,46 +262,42 @@ class Preprocessor(object):
         return self._get_single_item(indices)
 
     def _get_single_item(self, index):
-        fname = self.dataset[index]
-        fpath = osp.join(self.images_path, fname)
-        if os.path.isfile(fpath):
-            img = Image.open(fpath).convert('RGB')
+        t = self.dataset[index]
+        feat_path = t[1]
+        img_path = t[0]
+        num = int(img_path.split('_')[-1].split('.')[0])
+        if os.path.isfile(img_path):
+            img = Image.open(img_path).convert('RGB')
         else:
             img = Image.new('RGB', self.default_size)
             print('No such images: {:s}'.format(fpath))
         if self.transform is not None:
             img = self.transform(img)
-        return img, fname
+        return img, feat_path, num
 
-
-def get_data(video_id, img_path, batch_size, workers, keyf_num, args):
-    has_data = False
-    dataset = []
-    tmp = {}
-    for x in os.listdir(img_path):    # image nums
-        #shot_0023_img_4.jpg
-        cols = x.split('/')[-1].split('.')[0].split('_')
-        num = int(cols[3])
-        if num <= keyf_num:
-            if cols[1] not in tmp:
-                tmp[cols[1]] = num
-            tmp[cols[1]] = max(num, tmp[cols[1]])
-    for k, v in tmp.items():
-        save_fn = osp.join(args.save_feat_path, video_id, "shot_{}.npy".format(k))
-        if os.path.exists(save_fn):
+def get_data_loader(dataset, batch_size, workers, keyf_num, args):
+    t = []
+    dataset = sorted(dataset)
+    for x in dataset:
+        cols = x.split('/')
+        vid = cols[-2]
+        shotid = '_'.join(cols[-1].split('_')[:2])
+        feat_path = os.path.join(args.feat_path, vid, shotid + '.npy')
+        if os.path.exists(feat_path):
             continue
-        dataset.append('shot_{}_img_{}.jpg'.format(k, v))
-        has_data = True
-    if not has_data:
-        return has_data, dataset, None
-    if len(dataset) % batch_size < batch_size:   #保持完成batch size
+        num = int(cols[-1].split('_')[-1].split('.')[0])
+        if num >= keyf_num:
+            continue
+        t.append([x, feat_path])
+    dataset = t
+    if len(dataset) % batch_size < batch_size:
         for i in range(batch_size - len(dataset) % batch_size):
-            dataset.append(dataset[-1])
-    print(len(dataset), dataset)
-    # data transforms, Imagenet mean and std
+            t.append(t[-1])
+
     normalizer = transforms.Normalize(
         mean=[0.485, 0.456, 0.406],
         std=[0.229, 0.224, 0.225])
+
     data_transformer = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -352,126 +305,42 @@ def get_data(video_id, img_path, batch_size, workers, keyf_num, args):
         normalizer,
     ])
 
-    # data loaders
     data_loader = DataLoader(
-        Preprocessor(dataset, img_path, default_size=(256, 256), transform=data_transformer),
+        Preprocessor(args, dataset, default_size=(256, 256), transform=data_transformer),
         batch_size=batch_size, num_workers=workers,
         shuffle=False, pin_memory=True)
 
-    return has_data, dataset, data_loader
+    return data_loader
 
-
-def get_img_folder(data_root, video_id):
-    img_folder = osp.join(data_root, video_id)
-    if osp.isdir(img_folder):
-#         return os.path.join(img_folder, video_id)
-        return img_folder
-    else:
-        print('No such movie: {}'.format(video_id))
-        return None
-
-def run(extractor, video_id, video_list, idx_m, args):
-    print('****** {}, {} / {}, {} ******'.format(datetime.now(), idx_m+1, len(video_list), video_id))
-    '''
-    save_path = osp.join(args.save_path, video_id)
-    os.makedirs(save_path, exist_ok=True)
-    '''
-    img_path = get_img_folder(args.source_img_path, video_id)    # video/image_path
-    if not osp.isdir(img_path): #img没有生成, 先暂时return
-        print('Cannot find images!')
-        return
-
-    '''
-    feat_save_name = osp.join(save_path, 'feat.pkl')
-    score_save_name = osp.join(save_path, 'score.pkl')
-    if osp.isfile(feat_save_name) and osp.isfile(score_save_name):
-        print('{}, {} exist.'.format(datetime.now(), video_id))
-        return
-    '''
-    # create data loaders
-    has_data, dataset, data_loader = get_data(video_id, img_path, args.batch_size, args.workers, args.keyf_num, args)
-    if not has_data:
-        print('{} place feat has been extract.'.format(video_id))
-        return
-
-    # extract feature
-    try:
-        print('{}, extracting features...'.format(datetime.now()))
-        feat_dict, score_dict = extractor.extract_feature(data_loader, print_summary=False)
-        for key, item in feat_dict.items():
-            item = to_numpy(item)
-            os.makedirs(osp.join(args.save_feat_path,video_id),exist_ok = True)
-            img_ind = key.split("_")[-1].split(".jpg")[0]
-            
-            #只生成一个key frame特征
-            shot_ind = key.split("_")[1]
-            save_fn = osp.join(args.save_feat_path,video_id,"shot_{}.npy".format(shot_ind))
-            np.save(save_fn,item)                    
-                    
-        '''
-        print('{}, saving...'.format(datetime.now()))
-        with open(feat_save_name, 'wb') as f:
-            pickle.dump(feat_dict, f)
-        with open(score_save_name, 'wb') as f:
-            pickle.dump(score_dict, f)
-        '''
-    except Exception as e:
-        print('{} error! {}'.format(video_id, e))
-    print('\n')
+def run(dataset, extractor, args):
+    data_loader = get_data_loader(dataset, args.batch_size, args.workers, args.keyf_num, args)
+    extractor.extract_feature(data_loader)
 
 def main(args):
-    print(args)
     cudnn.benchmark = True
-    # create model
     model = ResNet50(pretrained=True)
     if args.use_gpu == 1:
         model = torch.nn.DataParallel(model)
         model = model.cuda()
-    # create and extractor
     extractor = Extractor(model, args)
     
-    if args.list_file is None:
-        video_list = sorted(os.listdir(args.source_img_path))
-    else:
-        video_list = [x for x in open(args.list_file)] 
-    video_list = [i.split(".m")[0] for i in video_list] ## to remove suffix .mp4 .mov etc. if applicable
-    video_list = video_list[args.st:args.ed]
-    print('****** Total {} videos ******'.format(len(video_list)))
+    video_dir_list = [os.path.join(args.source_img_path, x) for x in os.listdir(args.source_img_path)]
+    dataset = []
+    for video_dir in video_dir_list:
+        dataset.extend([os.path.join(video_dir, x) for x in os.listdir(video_dir)])
+    run(dataset, extractor, args)
     
-    ps = []
-    with ThreadPoolExecutor(args.max_worker) as executor:
-        for idx_m, video_id in enumerate(video_list):
-            ps.append(executor.submit(run, extractor, video_id, video_list, idx_m, args))
-        for p in ps:
-            p.result()
-    '''
-    for idx_m, video_id in enumerate(video_list):
-        run(extractor, video_id, video_list, idx_m, args)
-    '''
-
-
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
     parser = argparse.ArgumentParser("Place feature using ResNet50 with ImageNet pretrain")
     parser.add_argument('--use_gpu', type=int, default=0)
-    parser.add_argument('--max_worker', type=int, default=5)
+    parser.add_argument('--workers', type=int, default=10)
     parser.add_argument('--data_root', type=str, default="/home/tione/notebook/dataset/train_5k_A/shot_hsv")
-    parser.add_argument('--save-one-frame-feat', type=bool, default=True)
-    parser.add_argument('-b', '--batch-size', type=int, default=32)
-    parser.add_argument('-j', '--workers', type=int, default=2)
-    parser.add_argument('--keyf_num', type=int, default=2)
-    # parser.add_argument('--list_file', type=str, default=osp.join(data_root,'meta/list_test.txt'),
-                        # help='The list of videos to be processed,\
-                        # in the form of xxxx0.mp4\nxxxx1.mp4\nxxxx2.mp4\n \
-                        #             or xxxx0\nxxxx1\nxxxx2\n')
-    # parser.add_argument('--source_img_path', type=str,default=osp.join(data_root,'shot_keyf'))
-    # parser.add_argument('--save_path',type=str,default=osp.join(data_root,'place_feat_raw'))
-    # parser.add_argument('--save_feat_path',type=str,default=osp.join(data_root,'place_feat'))
-    parser.add_argument('--st', type=int, default=0, help='start number') 
-    parser.add_argument('--ed', type=int, default=9999999, help='end number')
+    parser.add_argument('--batch-size', type=int, default=128)
+    parser.add_argument('--keyf_num', type=int, default=4)
     args = parser.parse_args()
-    #args.list_file = osp.join(args.data_root,'meta/list_test.txt')
     args.list_file = None
-    args.source_img_path = osp.join(args.data_root,'shot_keyf')
-    args.save_path = osp.join(args.data_root,'place_feat_raw')
-    args.save_feat_path = osp.join(args.data_root,'place_feat')
+    args.source_img_path = osp.join(args.data_root, 'shot_keyf')
+    args.feat_path = osp.join(args.data_root, 'place_feat')
+    os.makedirs(args.feat_path, exist_ok=True)
     main(args)

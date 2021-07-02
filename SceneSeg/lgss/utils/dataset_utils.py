@@ -102,12 +102,17 @@ def scene2video(cfg, scene_list, args, video_name):
     fps = vcap.get(cv2.CAP_PROP_FPS)
     last_frame = vcap.get(cv2.CAP_PROP_FRAME_COUNT) - 1
     out_video_dir_fn = cfg.output_root
+    t1 = len(scene_list)
     if len(scene_list) == 0:
         scene_list.append([0, last_frame])
     else:
         t = scene_list[-1][1] + 1
         if t < last_frame:
             scene_list.append([t, last_frame])
+    t2 = len(scene_list)
+    if t1 == t2:
+        print(t1, t2, scene_list)
+    return scene_list
     #mkdir_ifmiss(out_video_dir_fn)
     #fs = open('{}/{}.info'.format(out_video_dir_fn, video_name))
     for scene_ind, scene_item in enumerate(scene_list):

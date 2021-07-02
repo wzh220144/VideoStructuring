@@ -2,13 +2,14 @@ experiment_name = "inference_transnet_v2_log"
 experiment_description = "scene segmentation using images only"
 
 # overall confg
-data_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2'
-#data_root = '/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2'
-video_dir = '/home/tione/notebook/dataset/videos/test_5k_2nd'
-#video_dir = '/home/tione/notebook/dataset/videos/train_5k_A'
+#data_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2'
+data_root = '/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2'
+#video_dir = '/home/tione/notebook/dataset/videos/test_5k_2nd'
+video_dir = '/home/tione/notebook/dataset/videos/train_5k_A'
+#output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/output'
+output_root = '/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/output'
+
 model_path = '/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/model'
-output_root = '/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/output'
-#output_root = '/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/output'
 shot_frm_path = data_root + "/shot_txt"
 shot_num = 6
 seq_len = 4
