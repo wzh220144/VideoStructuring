@@ -42,13 +42,14 @@ def train(cfg, model, train_loader, val_loader, optimizer, scheduler, epoch, cri
     probs = []
     total_loss = 0.0
     cnt = 0
+    model = model.to('cuda:0')
     model.train()
     for batch_idx, (data_place, data_vit, data_act, data_aud, target, end_frames, video_ids, shot_ids, end_shotids) in enumerate(train_loader):
-        data_place = data_place.cuda() if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
-        data_vit = data_vit.cuda() if 'vit' in cfg.dataset.mode else []
-        data_act = data_act.cuda() if 'act' in cfg.dataset.mode else []
-        data_aud = data_aud.cuda() if 'aud' in cfg.dataset.mode else []
-        target = target.view(-1).cuda()
+        data_place = data_place.cuda().to('cuda:0') if 'place' in cfg.dataset.mode or 'image' in cfg.dataset.mode else []
+        data_vit = data_vit.cuda().to('cuda:0') if 'vit' in cfg.dataset.mode else []
+        data_act = data_act.cuda().to('cuda:0') if 'act' in cfg.dataset.mode else []
+        data_aud = data_aud.cuda().to('cuda:0') if 'aud' in cfg.dataset.mode else []
+        target = target.view(-1).cuda().to('cuda:0')
         #print(len(target))
         optimizer.zero_grad()
         outs = model(data_place, data_vit, data_act, data_aud)

@@ -32,17 +32,16 @@ class NeXtVLAD(nn.Module):
         self.fc2 = nn.Linear(expansion * feature_size, group * nextvlad_cluster_size)
         self.bn1 = nn.BatchNorm1d(group * nextvlad_cluster_size)
         self.new_feature_size = expansion * feature_size // group
-        self.cluster_weights = torch.empty(1, self.new_feature_size, nextvlad_cluster_size).cuda()
+        self.cluster_weights = torch.empty(1, self.new_feature_size, nextvlad_cluster_size).cuda().to('cuda:0')
         nn.init.kaiming_normal_(self.cluster_weights, mode='fan_out', nonlinearity='relu')
+        self.cluster_weights = torch.nn.parameter.Parameter(self.cluster_weights)
         self.bn2 = nn.BatchNorm1d(self.nextvlad_cluster_size * self.new_feature_size)
 
     def forward(self, x):
-        print(x.shape)
         x = self.fc1(x)
         attention = F.sigmoid(self.attention(x)).view(-1, self.frame * self.group, 1)
         reshape_x = x.view(-1, self.expansion * self.feature_size)
         t1 = self.fc2(reshape_x)
-        print(t1.shape)
         t2 = self.bn1(t1)
         activation = t2.view(-1, self.frame * self.group, self.nextvlad_cluster_size)
         activation = F.softmax(activation, -1)
@@ -171,7 +170,8 @@ class LGSSone(nn.Module):
         if mode == "place":
             place = cfg.model.place
             self.input_dim = (place.output_dim + cfg.model.sim_channel)
-            #self.bnet = BNet(cfg)
+            self.fc = nn.Linear(32768, place.output_dim)
+            self.bnet = BNet(cfg)
             self.next_vlad = NeXtVLAD(cfg, place.feature_size, place.frame, place.group, place.expansion, place.nextvlad_cluster_size)
         elif mode == "vit":
             self.bnet = BNet(cfg)
@@ -201,12 +201,13 @@ class LGSSone(nn.Module):
         self.lstm.flatten_parameters()
         if self.mode == 'place':
             x = self.next_vlad(x)
-            print(x.shape)
-        else:
-            x = self.bnet(x)
-            x = x.view(-1, self.seq_len, x.shape[-1])
+            x = self.fc(x).view(-1, self.cfg.seq_len, self.cfg.shot_num, self.cfg.model.place.output_dim)
+        
+        x = self.bnet(x)
+        x = x.view(-1, self.seq_len, x.shape[-1])
         out, (_, _) = self.lstm(x, None)
         out = F.relu(self.fc1(out))
+
         if self.cfg.model.model_mode == 1:
             out = self.fc2(out)
             out = out.view(-1, 2)

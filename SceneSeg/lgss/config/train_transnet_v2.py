@@ -20,7 +20,7 @@ dataset = dict(
 
 model = dict(
     name='LGSS',
-    model_mode = 2,
+    model_mode = 1,
     sim_channel = 512,  # dim of similarity vector
     place = dict(
         feature_size = 2048,
@@ -45,7 +45,7 @@ model = dict(
 
 optim = dict(name = 'Adam',
              setting = dict(lr = 1e-3, weight_decay = 5e-4))
-stepper = dict(name='MultiStepLR', setting=dict(milestones = [20, 30, 40, 50], gamma = 0.1))
+stepper = dict(name='MultiStepLR', setting=dict(milestones = [25], gamma = 0.1))
 loss = dict(weight=[0.5, 5])
 
 resume = None
