@@ -4,7 +4,7 @@
 ModelConfig:
   model_type: 'NextVladBERT'
   use_modal_drop: True #在训练过程中，对多模态特征的某一模态进行丢弃
-  with_embedding_bn: False #对不同模态输入特征进行BN归一化
+  with_embedding_bn: True #对不同模态输入特征进行BN归一化
   modal_drop_rate: 0.3
   with_video_head: True #视频特征
   with_audio_head: True #音频特征
@@ -57,10 +57,10 @@ ModelConfig:
     hidden1_size: 1024
     gating_reduction: 8 # reduction factor in se context gating
     drop_rate:
-      video: 0.8
-      audio: 0.5
-      image: 0.5
-      text: 0.5
+      video: 0.7
+      audio: 0.4
+      image: 0.4
+      text: 0.4
       fusion: 0.8
       
   #tagging分类器参数
@@ -104,16 +104,16 @@ DatasetConfig:
   shuffle: True
   train_data_source_list:
     train1:
-      file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/train.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/VideoStructuring/dataset/train_5k_A/tag_sample/train.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
     train2:
-      file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/train.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/VideoStructuring/dataset/train_5k_A/tag_sample/train.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
 
 
   valid_data_source_list:
     val1:
-      file: '/home/tione/notebook/VideoStructuring/dataset/sample/tag/val.txt' # preprocessing脚本生成datafile文件，按需求修改
+      file: '/home/tione/notebook/VideoStructuring/dataset/train_5k_A/tag_sample/val.txt' # preprocessing脚本生成datafile文件，按需求修改
       batch_size: 128
 
   preprocess_root: '/home/tione/notebook/VideoStructuring/MultiModal-Tagging/src/dataloader/preprocess/'
@@ -125,7 +125,7 @@ DatasetConfig:
         class: 'frames_npy_preprocess.Preprocess'
         extra_args: 
           max_frames: 300
-          feat_dim: 1024
+          feat_dim: 768
           return_frames_num: True
           return_idx: True
 

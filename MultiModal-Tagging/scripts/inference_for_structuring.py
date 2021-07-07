@@ -11,12 +11,9 @@ import traceback
 import json
 import utils.tokenization as tokenization
 from utils.train_util import get_label_name_dict
-from src.feats_extract.multimodal_feature_extract import MultiModalFeatureExtract
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import tqdm
 import os.path as osp
-
-#################Inference Utils#################
 tokokenizer = tokenization.FullTokenizer(vocab_file='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/pretrained/bert/chinese_L-12_H-768_A-12/vocab.txt')
 class TaggingModel():
     def __init__(self, args):
@@ -40,13 +37,42 @@ class TaggingModel():
             self.signature = signature_def[tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY]
 
         batch_size = args.video_feats_extractor_batch_size
-        imgfeat_extractor = args.imgfeat_extractor
-        self.feat_extractor = MultiModalFeatureExtract(batch_size=batch_size,
-                             extract_video = args.extract_video, 
-                             extract_audio = args.extract_audio, 
-                             extract_ocr = args.extract_ocr,
-                             extract_asr = args.extract_asr,
-                             extract_img = args.extract_img)
+
+    def extract_video_feat(self, feat_dict, video_npy_path):
+        feat_dict['video'] = []
+        if video_npy_path is not None and os.path.exists(video_npy_path):
+            feat_dict['video'] = np.load(video_npy_path)
+        return feat_dict
+
+    def extract_img_feat(self, feat_dict, image_jpg_path):
+        feat_dict['image'] = []
+        if image_jpg_path is not None and os.path.exists(image_jpg_path):
+            feat_dict['image'] = cv2.imread(image_jpg_path, 1)
+        return feat_dict
+
+    def extract_audio_feat(self, feat_dict, audio_npy_path):
+        feat_dict['audio'] = []
+        if audio_npy_path is not None and os.path.exists(audio_npy_path):
+            feat_dict['audio'] = np.load(audio_npy_path)
+        return feat_dict
+
+    def extract_feat(self, video_file, video_npy_path=None, text_txt_path=None, audio_npy_path=None, img_jpg_path=None, ocr_file_path=None, asr_file_path=None):
+        cap = cv2.VideoCapture(video_file)
+        frame_count, fps, h, w, ts = self.read_video_info(cap, video_file)
+        cap.release()
+
+        feat_dict={}
+
+        print('start extract feat {}.'.format(video_file))
+        feat_dict = self.extract_video_feat(feat_dict, video_npy_path)
+        feat_dict = self.extract_img_feat(feat_dict, img_jpg_path)
+        feat_dict = self.extract_audio_feat(feat_dict, audio_npy_path)
+        feat_dict['text'] = ''
+        if os.path.exists(text_txt_path):
+            with open(text_txt_path, 'r') as f:
+                feat_dict['text'] = f.readline().strip('\n')
+        print('end extract feat {}.'.format(video_file))
+        return feat_dict
 
     def image_preprocess(self, image, rescale=224):
         #resize to 224 and normlize to 0-1, then perform f(x)= 2*(x-0.5)
@@ -92,6 +118,12 @@ class TaggingModel():
             ret_dict[feat_type] = feats
         return ret_dict
 
+    def read_video_info(self, cap, video_file):
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        ts = [frame_count / fps for x in range(frame_count)]
+        return frame_count, fps, h, w, ts
 
     def inference(self, test_file, args):
         vid = test_file.split("/")[-1].split(".m")[0]
@@ -112,15 +144,14 @@ class TaggingModel():
 
         with self.sess.as_default() as sess:
             start_time = time.time()
-            feat_dict = self.feat_extractor.extract_feat(
+            feat_dict = self.extract_feat(
                     test_file,
                     video_npy_path,
                     text_txt_path,
                     audio_npy_path,
                     image_jpg_path,
                     ocr_txt_path,
-                    asr_txt_path,
-                    True)
+                    asr_txt_path)
             end_time = time.time()
             print("feature extract cost time: {} sec".format(end_time - start_time))
 
@@ -157,7 +188,7 @@ class TaggingModel():
 def run(test_file, args, model):
     key = test_file.split('/')[-1].split('.m')[0]
     p = osp.join(args.output_base, key)
-    video_id, start_time, end_time, fps = test_file.split("/")[-1].split(".m")[0].split("#")
+    video_id, _, start_time, end_time, fps = test_file.split("/")[-1].split(".m")[0].split("#")
     if osp.exists(p):
         labels = []
         scores = []
@@ -200,27 +231,29 @@ def run(test_file, args, model):
         cur_output = {}
     '''
 
-    video_id, start_time, end_time, _ = test_file.split("/")[-1].split(".m")[0].split("#")
+    video_id, _, start_time, end_time, _ = test_file.split("/")[-1].split(".m")[0].split("#")
 
     return (video_id, cur_output)
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_pb', default='/home/tione/notebook/VideoStructuring/MultiModal-Tagging/checkpoints/structuring_train5k/export/step_8000_1.1595',type=str)
+    parser.add_argument('--model_pb', default='/home/tione/notebook/dataset/model/tag/export/step_9000_1.1842',type=str)
     parser.add_argument('--tag_id_file', default='/home/tione/notebook/dataset/label_id.txt')
-    parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/split/test_5k_A')
+    #parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/output')
+    parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/output')
     parser.add_argument('--postfix', default='.mp4', type=str, help='test file type')
     parser.add_argument('--top_k', type=int, default=20)
-    parser.add_argument('--output', default="results/result_for_vis.txt", type=str) #用于可视化文件
-    parser.add_argument('--output_base', default="/home/tione/notebook/dataset/result/tag", type=str) #用于可视化文件
-    parser.add_argument('--output_json', default="/home/tione/notebook/dataset/result/tag/outjson.txt", type=str) #用于模型精度评估
+    #parser.add_argument('--output_base', default="/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/tag_results", type=str) #用于可视化文件
+    parser.add_argument('--output_base', default="/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/tag_results", type=str) #用于可视化文件
+    #parser.add_argument('--output_json', default="/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/outjson.txt", type=str) #用于模型精度评估
+    parser.add_argument('--output_json', default="/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/outjson.txt", type=str) #用于模型精度评估
     parser.add_argument('--max_worker', type=int, default=20)
     parser.add_argument('--save_feat', type=bool, default=True)
     parser.add_argument('--use_gpu', type=int, default=1)
     parser.add_argument('--imgfeat_extractor', type=str, default='Youtube8M')
     parser.add_argument('--video_feats_extractor_batch_size', type=int, default=8)
-    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/split_feats/test_5k_A')
+    #parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/output_feats')
+    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/split_feats')
     parser.add_argument('--extract_video', type=bool, default=True)
     parser.add_argument('--extract_img', type=bool, default=True)
     parser.add_argument('--extract_audio', type=bool, default=True)
@@ -229,7 +262,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.use_gpu == 1:
-        os.environ["CUDA_VISIBLE_DEVICES"]='0'
+        os.environ["CUDA_VISIBLE_DEVICES"]='1'
     
     model = TaggingModel(args)
     test_files = glob.glob(args.test_dir+'/*'+args.postfix)
@@ -243,14 +276,6 @@ if __name__ == '__main__':
     ocr_txt_folder = args.feat_dir + '/ocr_txt'
     asr_txt_folder = args.feat_dir + '/asr_txt'
     image_jpg_folder = args.feat_dir + '/image_jpg'
-    os.makedirs(args.feat_dir, exist_ok=True)
-    os.makedirs(video_npy_folder, exist_ok=True)
-    os.makedirs(image_jpg_folder, exist_ok=True)
-    os.makedirs(audio_npy_folder, exist_ok=True)
-    os.makedirs(text_txt_folder, exist_ok=True)
-    os.makedirs(ocr_txt_folder, exist_ok=True)
-    os.makedirs(asr_txt_folder, exist_ok=True)
-    os.makedirs(image_jpg_folder, exist_ok=True)
     os.makedirs(args.output_base, exist_ok=True)
 
 

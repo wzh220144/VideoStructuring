@@ -1,15 +1,10 @@
-#coding=utf-8
-#Author: jefxiong@tencent.com
-#--------------------------------
-# 生成训练数据格式文件
-##-------------------------------
-
 import os
 import time
 import argparse
 import sys
 import tqdm
 import random
+import json
 
 def convert_dataformat(line, out_file_dir, frame_npy_folder, audio_npy_folder, image_folder, text_txt_folder, modal_num):
   global count
@@ -50,38 +45,42 @@ def convert_dataformat(line, out_file_dir, frame_npy_folder, audio_npy_folder, i
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--info_file', default='/home/tione/notebook/dataset/GroundTruth/structuring_tagging_info.txt',type=str)
-    parser.add_argument('--out_file_dir', default='/home/tione/notebook/dataset/sample/tag', type=str)
+    parser.add_argument('--out_file_dir', default='/home/tione/notebook/dataset/train_5k_A/tag_sample', type=str)
     parser.add_argument('--tag_dict_path', default='/home/tione/notebook/dataset/label_id.txt', type=str)
-    parser.add_argument('--frame_npy_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/video_npy', type=str)
-    parser.add_argument('--audio_npy_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/audio_npy', type=str)
-    parser.add_argument('--text_txt_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/text_txt',type=str) 
-    parser.add_argument('--image_folder', default='/home/tione/notebook/dataset/split_feats/train_5k_A/image_jpg', type=str)
+    parser.add_argument('--frame_npy_folder', default='/home/tione/notebook/dataset/train_5k_A/split_feats/video_npy', type=str)
+    parser.add_argument('--audio_npy_folder', default='/home/tione/notebook/dataset/train_5k_A/split_feats/audio_npy', type=str)
+    parser.add_argument('--text_txt_folder', default='/home/tione/notebook/dataset/train_5k_A/split_feats/ocr_txt',type=str) 
+    parser.add_argument('--image_folder', default='/home/tione/notebook/dataset/train_5k_A/split_feats/image_jpg', type=str)
     parser.add_argument('--modal_num', default=4, type=int)
+    parser.add_argument('--split_file', default='/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/meta/split.json', type=str)
     parser.add_argument('--ratio', default=0.9, type=float)
     count = 0
     args = parser.parse_args()
     if os.path.exists(args.tag_dict_path):
-      with open(args.tag_dict_path, 'r') as f:
-        tag_dict = {}
-        for line in f:
-          line = line.strip().split('\t')
-          tag_dict[line[0]] = line[1]
-        print(tag_dict)
-    else:
-      print("dict file {} not found".format(args.tag_dict_path))
-      raise
+        with open(args.tag_dict_path, 'r') as f:
+            tag_dict = {}
+            for line in f:
+                line = line.strip().split('\t')
+                tag_dict[line[0]] = line[1]
+            print(tag_dict)
+
+    with open(args.split_file, 'r') as f:
+        obj = json.load(f)
+    train = set(obj['train'])
+    val = set(obj['val'])
 
     with open(args.info_file,encoding='utf-8') as f:
         lines = [line for line in f]
-        random.shuffle(lines)
 
-        train_nums = args.ratio * len(lines)
         os.makedirs(args.out_file_dir, exist_ok=True)
         train_file = os.path.join(args.out_file_dir, 'train.txt')
         val_file = os.path.join(args.out_file_dir, 'val.txt')
         out_file_train = open(train_file,'w',encoding='utf-8')
         out_file_val = open(val_file,'w',encoding='utf-8')
-        for index,line in tqdm.tqdm(enumerate(lines), total=len(lines)):
-          out_file = out_file_train if index < train_nums else out_file_val
-          convert_dataformat(line, out_file, args.frame_npy_folder, args.audio_npy_folder, args.image_folder, args.text_txt_folder, args.modal_num)
+        for index, line in tqdm.tqdm(enumerate(lines), total=len(lines)):
+            if line.split('\t')[0].split('#')[0] in train:
+                out_file = out_file_train
+            else:
+                out_file = out_file_val
+            convert_dataformat(line, out_file, args.frame_npy_folder, args.audio_npy_folder, args.image_folder, args.text_txt_folder, args.modal_num)
     print(count)
