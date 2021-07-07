@@ -27,17 +27,6 @@ def data_partition(cfg, imdbidlist_json, annos_dict):
                     #one_idxs.append({'imdbid': imdbid, 'shotid': strcal(cfg.seq_len * i, j), "endshot": end_shot})
                     one_idxs.append({'imdbid': imdbid, 'shotid': shotid_list[cfg.seq_len * i + j], "endshot": end_shot})
                 one_mode_idxs.append(one_idxs)
-            '''    
-            shotid_tmp = 0
-            for shotid in shotid_list:
-                if int(shotid) < shotid_tmp+seq_len_half:
-                    continue
-                shotid_tmp = int(shotid)+seq_len_half
-                one_idxs = []
-                for idx in range(-seq_len_half+1, seq_len_half+1):
-                    one_idxs.append({'imdbid':imdbid, 'shotid': strcal(shotid, idx)})
-                one_mode_idxs.append(one_idxs)
-            '''
         idxs.append(one_mode_idxs)
     partition = {}
     partition['train'] = idxs[0]

@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pdb
+import numpy as np
 
 class NeXtVLAD(nn.Module):
     def __init__(self, cfg, feature_size, frame, group, expansion, nextvlad_cluster_size):
@@ -102,10 +103,10 @@ class AudNet(nn.Module):
 
 
 class Cos(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, config):
         super(Cos, self).__init__()
         self.shot_num = cfg.shot_num
-        self.channel = cfg.model.sim_channel
+        self.channel = config.sim_channel
         self.conv1 = nn.Conv2d(1, self.channel, kernel_size=(self.shot_num//2, 1))
 
     def forward(self, x):  # [batch_size, seq_len, shot_num, feat_dim]
@@ -117,15 +118,14 @@ class Cos(nn.Module):
         x = F.cosine_similarity(part1, part2, dim=2)  # batch_size,channel
         return x
 
-
 class BNet(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, config):
         super(BNet, self).__init__()
         self.shot_num = cfg.shot_num
-        self.channel = cfg.model.sim_channel
+        self.channel = config.sim_channel
         self.conv1 = nn.Conv2d(1, self.channel, kernel_size=(cfg.shot_num, 1))
         self.max3d = nn.MaxPool3d(kernel_size=(self.channel, 1, 1))
-        self.cos = Cos(cfg)
+        self.cos = Cos(cfg, config)
 
     def forward(self, x):  # [batch_size, seq_len, shot_num, feat_dim]
         context = x.view(x.shape[0]*x.shape[1], 1, -1, x.shape[-1])
@@ -138,10 +138,10 @@ class BNet(nn.Module):
 
 
 class BNetAud(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, config):
         super(BNetAud, self).__init__()
         self.shot_num = cfg.shot_num
-        self.channel = cfg.model.sim_channel
+        self.channel = config.sim_channel
         self.AudNet = AudNet(cfg)
         self.conv1 = nn.Conv2d(1, self.channel, kernel_size=(cfg.shot_num, 1))
         self.conv2 = nn.Conv2d(1, self.channel, kernel_size=(cfg.shot_num//2, 1))
@@ -161,40 +161,29 @@ class BNetAud(nn.Module):
 
 
 class LGSSone(nn.Module):
-    def __init__(self, cfg, mode="place"):
+    def __init__(self, cfg, modal, config):
         super(LGSSone, self).__init__()
         self.mode = mode
         self.seq_len = cfg.seq_len
-        self.num_layers = cfg.model.num_layers
-        self.lstm_hidden_size = cfg.model.lstm_hidden_size
-        if mode == "place":
-            place = cfg.model.place
-            self.input_dim = (place.output_dim + cfg.model.sim_channel)
-            self.fc = nn.Linear(32768, place.output_dim)
-            self.bnet = BNet(cfg)
-            self.next_vlad = NeXtVLAD(cfg, place.feature_size, place.frame, place.group, place.expansion, place.nextvlad_cluster_size)
-        elif mode == "vit":
-            self.bnet = BNet(cfg)
-            self.input_dim = (cfg.model.vit_feat_dim + cfg.model.sim_channel)
-        elif mode == "act":
-            self.bnet = BNet(cfg)
-            self.input_dim = (cfg.model.act_feat_dim + cfg.model.sim_channel)
-        elif mode == "aud":
-            self.bnet = BNetAud(cfg)
-            self.input_dim = cfg.model.aud_feat_dim
+
+        self.num_layers = config.num_layers
+        self.lstm_hidden_size = config.lstm_hidden_size
+        if modal == 'aud':
+            self.bnet = BNetAud(cfg, config)
+            self.input_dim = config.input_dim
         else:
-            pass
+            self.bnet = BNet(cfg, config)
+            self.input_dim = (config.input_dim + config.sim_channel)
         self.lstm = nn.LSTM(input_size=self.input_dim,
                             hidden_size=self.lstm_hidden_size,
                             num_layers=self.num_layers,
                             batch_first=True,
-                            bidirectional=cfg.model.bidirectional)
+                            bidirectional=config.bidirectional)
 
-        if cfg.model.bidirectional:
-            self.fc1 = nn.Linear(self.lstm_hidden_size * 2, 100)
+        if config.bidirectional:
+            self.output_dim = self.lstm_hidden_size * 2
         else:
-            self.fc1 = nn.Linear(self.lstm_hidden_size, 100)
-        self.fc2 = nn.Linear(100, 2)
+            self.output_dim = self.lstm_hidden_size
         self.cfg = cfg
 
     def forward(self, x):
@@ -206,103 +195,91 @@ class LGSSone(nn.Module):
         x = self.bnet(x)
         x = x.view(-1, self.seq_len, x.shape[-1])
         out, (_, _) = self.lstm(x, None)
-        out = F.relu(self.fc1(out))
-
-        if self.cfg.model.model_mode == 1:
-            out = self.fc2(out)
-            out = out.view(-1, 2)
-        elif self.cfg.model.model_mode == 2:
-            pass
         return out
-            
+
 class LGSS(nn.Module):
     def __init__(self, cfg):
         super(LGSS, self).__init__()
         self.cfg = cfg
         self.seq_len = cfg.seq_len
-        self.mode = cfg.dataset.mode
-        self.num_layers = cfg.model.num_layers
-        self.lstm_hidden_size = cfg.model.lstm_hidden_size
-        self.ratio = cfg.model.ratio
-        self.classify_head = {}
-        self.dim = 0
-        if 'place' in self.mode:
-            self.bnet_place = LGSSone(cfg, "place")
-            self.dim += 100
-        if 'vit' in self.mode:
-            self.bnet_vit = LGSSone(cfg, "vit")
-            self.dim += 100
-        if 'act' in self.mode:
-            self.bnet_act = LGSSone(cfg, "act")
-            self.dim += 100
-        if 'aud' in self.mode:
-            self.bnet_aud = LGSSone(cfg, "aud")
-            self.dim += 100
-        self.se_classify_head = nn.Linear(self.cfg.model.se_dim, 2)
-        self.se_layer = SELayer(self.cfg, self.dim, self.cfg.model.reduction)
+        self.modals = []
+        self.se_dict = nn.ModuleDict()
+        self.classify_dict = nn.ModuleDict()
+        self.bnet_dict = nn.ModuleDict()
+        self.fusion_dim = 0
+        self.lgssone_dict = nn.ModuleDict()
+        self.linear_dict = nn.ModuleDict()
+        for modal, config in cfg.model.modal.items():
+            if modal == 'fusion':
+                continue
+            if config.use != 1:
+                continue
+            self.modals.append(modal)
+            self.lgssone_dict[modal] = LGSSone(cfg, modal, config)
+            if self.cfg.model.model_mode == 1:
+                self.linear_dict[modal] = nn.Linear(self.lgssone_dict[modal].output_dim, config.output_dim)    #线性层
+            elif self.cfg.model.model_mode == 2:
+                self.se_dict[modal] = SELayer(cfg, config.dropout_ratio, self.lgssone_dict[modal].output_dim, config.se_dim, config.reduction, config.output_dim)  #se层
+            self.fusion_dim += config.output_dim
+            self.classify_dict[modal] = nn.Linear(self.lgssone_dict[modal].output_dim, 2)
+        fusion_config = cfg.model.modal['fusion']
+        if self.cfg.model.model_mode == 1:
+            self.linear_dict['fusion'] = nn.Linear(self.fusion_dim, fusion_config.output_dim)
+        elif self.cfg.model.model_mode == 2:
+            self.se_dict['fusion'] = SELayer(cfg, fusion_config.dropout_ratio, self.fusion_dim, config.se_dim, config.reduction, config.output_dim)
+        self.classify_dict['fusion'] = nn.Linear(fusion_config.output_dim, 2)
 
-    def _classify(self, classify_layer, x):
-        out = classify_layer(x)
-        out = out.view(-1, 2)
-        return out
-
-    def forward(self, place_feat, vit_feat, act_feat, aud_feat):
+    def forward(self, feat_dict):
         outs = {}
         if self.cfg.model.model_mode == 1:  #简单线性加权融合
-            out = 0
-            if 'place' in self.mode:
-                place_bound = self.bnet_place(place_feat)
-                out += self.ratio[0] * place_bound
-                outs['place'] = place_bound
-            if 'vit' in self.mode:
-                vit_bound = self.bnet_vit(vit_feat)
-                out += self.ratio[1] * vit_bound
-                outs['vit'] = vit_bound
-            if 'act' in self.mode:
-                act_bound = self.bnet_act(act_feat)
-                out += self.ratio[2] * act_bound
-                outs['act'] = act_bound
-            if 'aud' in self.mode:
-                aud_bound = self.bnet_aud(aud_feat)
-                out += self.ratio[3] * aud_bound
-                outs['aud'] = aud_bound
-            outs['fusion'] = out
+            fusion = []
+            for modal in self.modals:
+                x = self.lgssone_dict[modal](feat_dict[modal + '_feats'])
+                x = F.relu(x)
+                #是否增加bn
+                x = self.linear_dict[modal](x)
+                fusion.append(x)
+                x = self.classify_dict[modal](x)
+                outs['{}_logits'.format(modal)] = x.view(-1, 2)
+            fusion = torch.cat(fusion, dim = 2)
+            fusion = self.linear_dict['fusion'](fusion)
+            fusion = self.classify_dict['fusion'](fusion)
+            outs['fusion_logits'] = fusion.view(-1, 2)
         elif self.cfg.model.model_mode == 2:    #se融合
-            inputs = []
-            if 'place' in self.mode:
-                place_bound = self.bnet_place(place_feat)
-                inputs.append(place_bound)
-            if 'vit' in self.mode:
-                vit_bound = self.bnet_vit(vit_feat)
-                inputs.append(vit_bound)
-            if 'act' in self.mode:
-                act_bound = self.bnet_act(act_feat)
-                inputs.append(act_bound)
-            if 'aud' in self.mode:
-                aud_bound = self.bnet_aud(aud_feat)
-                inputs.append(aud_bound)
-            inputs = torch.cat(inputs, axis = 2)
-            out = self.se_layer(inputs)
-            out = self._classify(self.se_classify_head, out)
-            outs['fusion'] = out
+            fusion = []
+            for modal in self.modals:
+                x = self.lgssone_dict[modal](feat_dict[modal + '_feats'])
+                x = F.relu(x)
+                #是否增加bn
+                x = self.se_dict[modal](x)
+                fusion.append(x)
+                x = self.classify_dict[modal](x)
+                outs['{}_logits'.format(modal)] = x.view(-1, 2)
+            fusion = torch.cat(fusion, dim = 2)
+            fusion = self.se_dict['fusion'](fusion)
+            fusion = self.classify_dict['fusion'](fusion)
+            outs['fusion_logits'] = fusion.view(-1, 2)
+
+        for modal in self.modals + ['fusion']:
+            x = outs['{}_logits'.format(modal)]
         return outs
 
 class SELayer(nn.Module):
-    def __init__(self, cfg, input_dim, reduction):
+    def __init__(self, cfg, dropout_ratio, input_dim, se_dim, reduction, output_dim):
         super(SELayer, self).__init__()
-        self.cfg = cfg
-        if self.cfg.model.dropout_ratio > 0:
-            self.dropout = nn.Dropout(p=self.cfg.model.dropout_ratio)
+        self.dropout_ratio = dropout_ratio
+        self.dropout = nn.Dropout(p=dropout_ratio)
         self.input_dim = input_dim
-        self.fc1 = nn.Linear(self.input_dim, self.cfg.model.se_dim)
-        self.bn1 = nn.BatchNorm1d(self.cfg.seq_len)
-        self.fc2 = nn.Linear(self.cfg.model.se_dim, self.cfg.model.se_dim // reduction)
-        self.bn2 = nn.BatchNorm1d(self.cfg.seq_len)
-        self.fc3 = nn.Linear(self.cfg.model.se_dim // reduction, self.cfg.model.se_dim)
+        self.fc1 = nn.Linear(self.input_dim, se_dim)
+        self.bn1 = nn.BatchNorm1d(cfg.seq_len)
+        self.fc2 = nn.Linear(se_dim, se_dim // reduction)
+        self.bn2 = nn.BatchNorm1d(cfg.seq_len)
+        self.fc3 = nn.Linear(se_dim // reduction, se_dim)
         self.sigmoid = nn.Sigmoid()
+        self.fc4 = nn.Linear(se_dim, output_dim)
 
     def forward(self, x):
-        if self.cfg.model.dropout_ratio > 0:
+        if self.dropout_ratio > 0:
             x = self.dropout(x)
         x = self.fc1(x)
         out = self.bn1(x)
@@ -310,11 +287,12 @@ class SELayer(nn.Module):
         out = self.bn2(out)
         out = self.fc3(out)
         out = self.sigmoid(out)
-        return x * out
+        out = self.fc4(x * out)
+        return out
 
 if __name__ == '__main__':
     from mmcv import Config
-    cfg = Config.fromfile("../config/train_hsv.py")
+    cfg = Config.fromfile("/home/tione/notebook/VideoStructuring/SceneSeg/lgss/config/train_transnet_v2.py")
     model = LGSS(cfg)
     place_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 2048)
     vit_feat = torch.randn(cfg.batch_size, cfg.seq_len, cfg.shot_num, 768)
