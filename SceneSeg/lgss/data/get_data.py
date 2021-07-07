@@ -17,8 +17,12 @@ class Preprocessor(data.Dataset):
         # print(listIDs)
         self.data_root = cfg.data_root
         self.shot_boundary_range = range(-cfg.shot_num // 2 + 1, cfg.shot_num // 2 + 1)
-        self.mode = cfg.dataset.mode
-        assert (len(self.mode) > 0)
+        self.modals = {}
+        for k, v in cfg.model.modal.items():
+            if k == 'fusion':
+                continue
+            if v.use == 1:
+                self.modals[k] = v
         self.data_dict = data_dict
         self.fps_dict = {}
         self.shot_frames = {}
@@ -52,36 +56,33 @@ class Preprocessor(data.Dataset):
 
     def __getitem__(self, index):
         ID_list = self.listIDs[index]
-        if isinstance(ID_list, (tuple, list)):
-            place_feats, vit_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids = [], [], [], [], [], [], [], [], []
-            for ID in ID_list:
-                place_feat, vit_feat, act_feat, aud_feat, label, end_frame, video_id, shot_id, end_shotid = self._get_single_item(ID)
-                place_feats.append(place_feat)
-                vit_feats.append(vit_feat)
-                act_feats.append(act_feat)
-                aud_feats.append(aud_feat)
-                labels.append(label)
-                end_frames.append(end_frame)
-                video_ids.append(video_id)
-                shot_ids.append(shot_id)
-                end_shotids.append(end_shotid)
-            if 'place' in self.mode:
-                place_feats = torch.stack(place_feats)
-            if 'vit' in self.mode:
-                vit_feats = torch.stack(vit_feats)
-            if 'act' in self.mode:
-                act_feats = torch.stack(act_feats)
-            if 'aud' in self.mode:
-                aud_feats = torch.stack(aud_feats)
-            labels = np.array(labels)
-            end_frames = np.array(end_frames)
-            video_ids = video_ids
-            return place_feats, vit_feats, act_feats, aud_feats, labels, end_frames, video_ids, shot_ids, end_shotids
-        else:
-            return self._get_single_item(ID_list)
+        res = {'labels': [], 'end_frames': [], 'video_ids': [], 'shot_ids': [], 'end_shots': []}
+        for modal in self.modals.keys():
+            res['{}_feats'.format(modal)] = []
+        
+        for ID in ID_list:
+            single_res = self._get_single_item(ID)
+            for k, v in single_res.items():
+                res['{}s'.format(k)].append(v)
+            
+        for modal in sorted(self.modals.keys()):
+            res['{}_feats'.format(modal)] = torch.stack(res['{}_feats'.format(modal)])
+        res['labels'] = np.array(res['labels'])
+        res['end_frames']= np.array(res['end_frames'])
+        t = []
+        t.append('labels')
+        t.append('end_frames')
+        t.append('video_ids')
+        t.append('shot_ids')
+        t.append('end_shots')
+        for modal in sorted(self.modals.keys()):
+            t.append('{}_feats'.format(modal))
+        t = [res[x] for x in t]
+        return tuple(t)
 
     # 得到单条样本
     def _get_single_item(self, ID):
+        res = {}
         #得到vid
         imdbid = ID['imdbid']
         #得到当前主要shotid
@@ -103,41 +104,24 @@ class Preprocessor(data.Dataset):
             elif int(shotid) > end_shot:
                 label = self.data_dict["annos_dict"].get(imdbid).get(strcal(end_shot, 0), 0)
         #得到该shot对应feats
-        aud_feats = []
-        place_feats = []
-        vit_feats = []
-        act_feats = []
-        if 'place' in self.mode:
+        for modal in self.modals.keys():
+            res['{}_feat'.format(modal)] = []
             for ind in self.shot_boundary_range:
                 name = self.get_feat_name(shotid, ind, end_shot)
-                path = osp.join(self.data_root, '{}/{}'.format(self.cfg.place_base, imdbid), name)
-                place_feat = np.load(path, allow_pickle=True)
-                place_feats.append(torch.from_numpy(place_feat).float())
-        if 'vit' in self.mode:
-            for ind in self.shot_boundary_range:
-                name = self.get_feat_name(shotid, ind, end_shot)
-                path = osp.join(self.data_root, '{}/{}'.format(self.cfg.vit_base, imdbid), name)
-                vit_feat = np.load(path, allow_pickle=True)
-                vit_feats.append(torch.from_numpy(vit_feat).float())
-        if 'aud' in self.mode:
-            for ind in self.shot_boundary_range:
-                name = self.get_feat_name(shotid, ind, end_shot)
+                path = osp.join(self.data_root, '{}/{}'.format(self.modals[modal].base, imdbid), name)
                 try:
-                    path = osp.join(self.data_root, '{}/{}'.format(self.cfg.aud_base, imdbid), name)
-                    aud_feat = np.load(path)
-                    aud_feats.append(torch.from_numpy(aud_feat).float())
+                    feat = np.load(path, allow_pickle=True)
+                    res['{}_feat'.format(modal)].append(torch.from_numpy(feat).float())
                 except Exception as e:
                     print('{}:{}'.format(path, e))
-
-        if len(place_feats) > 0:
-            place_feats = torch.stack(place_feats)
-        if len(vit_feats) > 0:
-            vit_feats = torch.stack(vit_feats)
-        if len(act_feats) > 0:
-            act_feats = torch.stack(act_feats)
-        if len(aud_feats) > 0:
-            aud_feats = torch.stack(aud_feats)
-        return place_feats, vit_feats, act_feats, aud_feats, label, end_frame, imdbid, int(shotid), end_shot
+            if len(res['{}_feat'.format(modal)]) > 0:
+                res['{}_feat'.format(modal)] = torch.stack(res['{}_feat'.format(modal)])
+            res['label'] = label
+            res['end_frame'] = end_frame
+            res['video_id'] = imdbid
+            res['shot_id'] = int(shotid)
+            res['end_shot'] = end_shot
+        return res
 
     def get_feat_name(self, shotid, ind, end_shot):
         name = ''

@@ -73,6 +73,7 @@ if __name__ == '__main__':
     video_names = []
     video_inference_res = {}
     for video_path in glob.glob(os.path.join(cfg.video_dir, '*.mp4')):
+        print(video_path)
         video_name = os.path.basename(video_path).split(".m")[0]
         video_inference_res[video_name] = {}
         log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
@@ -85,8 +86,11 @@ if __name__ == '__main__':
         video_names.append(video_name)
     data = get_inference_data(cfg, video_names)
     data_loader = DataLoader(data, batch_size=cfg.batch_size, shuffle=False, **cfg.data_loader_kwargs)
-
-    criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
+    
+    if args.use_gpu == 1:
+        criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight).cuda())
+    else:
+        criterion = nn.CrossEntropyLoss(torch.Tensor(cfg.loss.weight))
     inference_res = lgss_util.inference(cfg, args, model, data_loader, criterion)
     for index in range(len(inference_res['video_ids'])):
         label = inference_res['labels'][index]

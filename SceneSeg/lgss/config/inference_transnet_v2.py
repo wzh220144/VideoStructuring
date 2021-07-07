@@ -10,6 +10,7 @@ video_dir = '/home/tione/notebook/dataset/videos/train_5k_A'
 output_root = '/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/output'
 
 model_path = '/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/model'
+
 shot_frm_path = data_root + "/shot_txt"
 shot_num = 6
 seq_len = 4
@@ -18,7 +19,6 @@ gpus = "0,1"
 place_base = 'place_feat'
 vit_base = 'vit_feat'
 aud_base = 'aud_feat'
-
 
 # dataset settings
 dataset = dict(

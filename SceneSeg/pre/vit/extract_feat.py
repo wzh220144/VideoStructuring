@@ -15,19 +15,25 @@ import time
 from pprint import pprint
 import cv2
 import tqdm
+import torch
+import torch.nn as nn
 
 from transformers import ViTFeatureExtractor, ViTForImageClassification, ViTModel
 
 class VitExtractor(object):
   def __init__(self, args):
-        self.feature_extractor = ViTFeatureExtractor.from_pretrained('google/vit-base-patch16-224')
-        self.model = ViTModel.from_pretrained('google/vit-base-patch16-224')
+        self.feature_extractor = ViTFeatureExtractor.from_pretrained('google/vit-base-patch32-384')
+        self.model = ViTModel.from_pretrained('google/vit-base-patch32-384')
+        if args.use_gpu == 1:
+            self.model = nn.DataParallel(self.model.cuda().to('cuda:0'))
 
   def extract_rgb_frame_features_list(self, frame_rgbs, count):
         inputs = self.feature_extractor(images=frame_rgbs, return_tensors="pt")
+        if args.use_gpu == 1:
+            inputs = {k: v.cuda().to('cuda:0') for k, v in inputs.items()}
         outputs = self.model(**inputs)
-        pooler_output = outputs.pooler_output
-        return pooler_output.detach().numpy()
+        last_hidden_state = outputs.last_hidden_state
+        return last_hidden_state[:,0,:].cpu().detach().numpy()
 
 def gen_batch(video_dir_list, args):
     count = 0
