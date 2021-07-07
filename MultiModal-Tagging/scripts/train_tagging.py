@@ -136,9 +136,10 @@ class TaggingTrainer(Trainer):
             logging.info(epochinfo)
             self.evl_metrics[index].clear()
         self.summary_writer.add_summary(fetch_dict_eval['val_summary_op'], global_step_val)
-
-        #return epoch_info_dict['gap'] + np.mean(epoch_info_dict['aps']) #融合特征的预测结果
-        return np.mean(epoch_info_dict['aps']) #融合特征的预测结果
+        epoch_info_dict['mAP'] = np.mean(epoch_info_dict['aps'])
+        print(epoch_info_dict)
+        return epoch_info_dict['gap'] + np.mean(epoch_info_dict['aps']) #融合特征的预测结果
+        #return np.mean(epoch_info_dict['aps']) #融合特征的预测结果
 
 def main():
     import argparse
@@ -148,7 +149,7 @@ def main():
     args = parser.parse_args()
     tf.disable_eager_execution()
     if args.use_gpu == 1:
-        os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+        os.environ["CUDA_VISIBLE_DEVICES"] = '0'
     train_main(args.config, TaggingTrainer)
 
 if __name__ == "__main__":

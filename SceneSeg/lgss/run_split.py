@@ -12,8 +12,6 @@ from utils.package import *
 import glob
 from concurrent.futures import ThreadPoolExecutor
 import json
-import lgss.models.lgss_util as lgss_util
-import lgss.models.lgss as lgss
 
 final_dict = {}
 
@@ -54,6 +52,7 @@ def parse_args():
     parser.add_argument('--threshold', type=float, default=0.94)
     parser.add_argument('--topn', type=int, default=-1)
     parser.add_argument('--smooth_threshold', type=float, default=0.1)
+    parser.add_argument('--split_file', type=str, default='/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/meta/split.json')
     args = parser.parse_args()
     return args
 
@@ -63,9 +62,16 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = cfg.gpus
     assert cfg.testFlag, "testFlag must be True"
 
+    test = set()
+    with open(args.split_file, 'r') as f:
+        obj = json.load(f)
+        test = set(obj['val'])
+
     video_inference_res = {}
     for video_path in glob.glob(os.path.join(cfg.video_dir, '*.mp4')):
         video_name = os.path.basename(video_path).split(".m")[0]
+        if video_name not in test:
+            continue
         video_inference_res[video_name] = {}
         log_path = os.path.join(cfg.data_root, "seg_results", video_name + '.json')
         if osp.exists(log_path):

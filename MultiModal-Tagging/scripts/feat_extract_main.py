@@ -31,14 +31,16 @@ if __name__ == '__main__':
     parser.add_argument('--postfix', default='mp4', type=str)
     parser.add_argument('--datafile_path', default='dataset/datafile.txt')
     parser.add_argument('--image_batch_size', default=20, type=int)
-    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/split_feats/train_5k_A')
+    parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/train_5k_A/split_feats')
     parser.add_argument('--extract_video', action="store_true", default=False)
     parser.add_argument('--extract_img', action="store_true", default=False)
     parser.add_argument('--extract_audio', action="store_true", default=False)
     parser.add_argument('--extract_asr', action="store_true", default=False)
     parser.add_argument('--extract_ocr', action="store_true", default=False)
-    parser.add_argument('--max_worker', type=int, default=1)
+    parser.add_argument('--max_worker', type=int, default=10)
     parser.add_argument('--use_gpu', action="store_true", default=False)
+    parser.add_argument('--log_file', type=str, default='/home/tione/notebook/VideoStructuring/err.log')
+    parser.add_argument('--cuda_devices', type=str, default='0,1')
     args = parser.parse_args()
     print(args)
 
@@ -59,7 +61,7 @@ if __name__ == '__main__':
     os.makedirs(image_jpg_folder, exist_ok=True)
 
     asr_extractor = VideoASR(args.use_gpu, args.max_worker)
-    os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.cuda_devices
     gen = MultiModalFeatureExtract(batch_size = args.image_batch_size,
             extract_video = args.extract_video,
             extract_img = args.extract_img,
@@ -67,7 +69,8 @@ if __name__ == '__main__':
             extract_ocr = args.extract_ocr,
             extract_asr = args.extract_asr,
             use_gpu = args.use_gpu,
-            asr_extractor = asr_extractor)
+            asr_extractor = asr_extractor,
+            log_file = args.log_file)
                 
     file_paths = glob.glob(args.files_dir+'/*.'+args.postfix)
 

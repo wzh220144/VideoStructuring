@@ -27,7 +27,7 @@ class VideoASR():
             self.decoder_queue.put(self.get_decoder())
 
     def get_decoder(self, language='zh-CN'):
-        language_directory = os.path.join("/home/tione/notebook/envs/tf2.0/lib/python3.6/site-packages/speech_recognition/pocketsphinx-data", language)
+        language_directory = os.path.join("/home/tione/notebook/envs/tf2/lib/python3.6/site-packages/speech_recognition/pocketsphinx-data", language)
         acoustic_parameters_directory = os.path.join(language_directory, "acoustic-model")
         language_model_file = os.path.join(language_directory, "language-model.lm.bin")
         phoneme_dictionary_file = os.path.join(language_directory, "pronounciation-dictionary.dict")
@@ -68,14 +68,14 @@ class VideoASR():
     
 class VideoOCR():
     def __init__(self, use_gpu):
-        self.reader = easyocr.Reader(['ch_sim','en'], gpu = use_gpu)
+        self.reader = easyocr.Reader(['ch_sim'], gpu = use_gpu)
     """视频OCR"""
-    def request(self, rgb):    #最多取三帧结果
+    def request(self, rgb):
         return list(self.reader.readtext(rgb, detail=0))
     
 class ImageOCR():
     def __init__(self, use_gpu):
-        self.reader = easyocr.Reader(['ch_sim','en'], gpu = use_gpu)
+        self.reader = easyocr.Reader(['ch_sim'], gpu = use_gpu)
 
     """图像OCR"""
     def request(self, file_name):

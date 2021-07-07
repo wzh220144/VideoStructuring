@@ -44,6 +44,7 @@ class MultiModalFeatureExtract(object):
                  extract_asr = True,
                  use_gpu = True,
                  asr_extractor = None,
+                 log_file = '/home/tione/notebook/VideoStructuring/err.log',
                  ):
         super(MultiModalFeatureExtract, self).__init__()
         self.extract_video = extract_video
@@ -80,33 +81,10 @@ class MultiModalFeatureExtract(object):
         if extract_asr:
             self.asr_extractor = asr_extractor
 
-        self.error_log = open('/home/tione/notebook/VideoStructuring/err.log', 'w')
+        self.error_log = open(log_file, 'w')
 
     def close():
         self.error_log.close()
-
-    def get_frames_same_interval(self, filename, every_ms=1000, max_num_frames=300):
-        video_capture = cv2.VideoCapture()
-        if not video_capture.open(filename):
-          print(sys.stderr, 'Error: Cannot open video file ' + filename)
-          return
-        last_ts = -99999  # The timestamp of last retrieved frame.
-        num_retrieved = 0
-
-        frame_all = []
-        while num_retrieved < max_num_frames:
-            # Skip frames
-            while video_capture.get(cv2.CAP_PROP_POS_MSEC) < every_ms + last_ts:
-                if not video_capture.read()[0]:
-                    return frame_all
-
-            last_ts = video_capture.get(cv2.CAP_PROP_POS_MSEC)
-            has_frames, frame = video_capture.read()
-            if not has_frames:
-                break
-            frame_all.append(frame[:, :, ::-1])
-            num_retrieved += 1
-        return frame_all
 
     def extract_video_feat(self, feat_dict, video_file, frames, video_npy_path, save):
         if self.extract_video:
@@ -122,7 +100,7 @@ class MultiModalFeatureExtract(object):
                 if save:
                     np.save(video_npy_path, feat_dict['video'])
             end_time = time.time()
-            self.error_log.write("{}: youtube8m extract cost {} sec.\n".format(video_file, end_time - start_time))
+            self.error_log.write("{}: video extract cost {} sec.\n".format(video_file, end_time - start_time))
         return feat_dict
 
     def extract_img_feat(self, feat_dict, video_file, frame, image_jpg_path, save):
@@ -169,18 +147,14 @@ class MultiModalFeatureExtract(object):
             else:
                 feat_dict['ocr'] = []
                 cap = cv2.VideoCapture(video_file)
-                frames = sorted(list(frames))
-                if len(frames) > 3:
-                    s = frames[0]
-                    e = frames[1]
-                    m = frames[len(frames) // 2]
-                    frames = [s, m, e]
+                frames = sorted(list(frames))[:5]
                 r_index, r_frame, r_time, count = self.gen_img_list(cap, set(frames))
                 for frame in r_frame:
                     feat_dict['ocr'].extend(self.ocr_extractor.request(frame))
+                feat_dict['ocr'] = '|'.join(feat_dict['ocr'])
                 if save:
                     with open(ocr_path, 'w') as f:
-                        f.write('|'.join(feat_dict['ocr']))
+                        f.write(feat_dict['ocr'])
                 cap.release()
 
             end_time = time.time()
@@ -225,9 +199,8 @@ class MultiModalFeatureExtract(object):
                 self.error_log.write('parse {} failed.'.format(video_file))
                 return {}
             feat_dict = self.extract_video_feat(feat_dict, video_file, frames, video_npy_path, save)
-            feat_dict = self.extract_img_feat(feat_dict, video_file, sorted(list(frames))[len(frames) // 2], img_jpg_path, save)
+            feat_dict = self.extract_img_feat(feat_dict, video_file, sorted(list(frames))[0], img_jpg_path, save)
             feat_dict = self.extract_ocr_feat(feat_dict, video_file, frames, ocr_file_path, save)
-
 
         if self.extract_audio or self.extract_asr:
             audio_file = video_file.replace('.mp4', '.wav')
@@ -298,5 +271,5 @@ class MultiModalFeatureExtract(object):
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         fps = cap.get(cv2.CAP_PROP_FPS)
-        ts = [frame_count / fps for x in range(frame_count)]
+        ts = [x / fps for x in range(frame_count)]
         return frame_count, fps, h, w, ts

@@ -71,10 +71,9 @@ class ANETdetection(object):
         for line in open(tag_id_dict, "r"):
             tag, idx = line.strip().split()
             self.tag_id_dict[tag] = idx
-        # print(self.tag_id_dict)
         # Import ground truth and predictions.
         self.ground_truth, self.activity_index = self._import_ground_truth(
-            ground_truth_filename)
+            ground_truth_filename, prediction_filename)
         self.prediction = self._import_prediction(prediction_filename)
 
         if self.verbose:
@@ -85,7 +84,7 @@ class ANETdetection(object):
             print("\tNumber of predictions: {}".format(nr_pred))
             print("\tFixed threshold for tiou score: {}".format(self.tiou_thresholds))
 
-    def _import_ground_truth(self, ground_truth_filename):
+    def _import_ground_truth(self, ground_truth_filename, prediction_filename):
         """Reads ground truth file, checks if it is well formatted, and returns
            the ground truth instances and the activity classes.
         Parameters
@@ -99,6 +98,8 @@ class ANETdetection(object):
         activity_index : dict
             Dictionary containing class index.
         """
+        with open(prediction_filename, 'r') as f:
+            obj = json.load(f)
         with open(ground_truth_filename, 'r') as fobj:
             data = json.load(fobj)
         # print(data)
@@ -107,6 +108,8 @@ class ANETdetection(object):
         video_lst, t_start_lst, t_end_lst, label_lst = [], [], [], []
         for videoid, v in data.items():
             if videoid in self.blocked_videos:
+                continue
+            if videoid not in obj:
                 continue
             for ann in v['annotations']:
                 for label in ann['labels']:
@@ -225,7 +228,7 @@ class ANETdetection(object):
 def compute_average_precision_detection(ground_truth, prediction, tiou_thresholds=np.linspace(0.5, 0.95, 10)):
     """Compute average precision (detection task) between ground truth and
     predictions data frames. If multiple predictions occurs for the same
-    predicted segment, only the one with highest score is matches as
+    predi_get_predictions_with_labelcted segment, only the one with highest score is matches as
     true positive. This code is greatly inspired by Pascal VOC devkit.
     Parameters
     ----------
@@ -312,9 +315,9 @@ def compute_average_precision_detection(ground_truth, prediction, tiou_threshold
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gt', default="train799.json", type=str)
-    parser.add_argument('--pred', default="structuring_train799_pred.json", type=str)
-    parser.add_argument('--tag_id_dict', default="tag-id-tagging.txt", type=str)
+    parser.add_argument('--gt', default="/home/tione/notebook/dataset/GroundTruth/train5k.txt", type=str)
+    parser.add_argument('--pred', default="/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/outjson.txt", type=str)
+    parser.add_argument('--tag_id_dict', default="/home/tione/notebook/dataset/label_id.txt", type=str)
     args = parser.parse_args()
 
     anet = ANETdetection(ground_truth_filename = args.gt, prediction_filename = args.pred, tag_id_dict = args.tag_id_dict)

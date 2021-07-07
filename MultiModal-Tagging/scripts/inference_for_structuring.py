@@ -237,18 +237,22 @@ def run(test_file, args, model):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_pb', default='/home/tione/notebook/dataset/model/tag/export/step_6000_0.3897',type=str)
+    parser.add_argument('--model_pb', default='/home/tione/notebook/dataset/model/tag/export/step_9000_1.1842',type=str)
     parser.add_argument('--tag_id_file', default='/home/tione/notebook/dataset/label_id.txt')
+    #parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/output')
     parser.add_argument('--test_dir', default='/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/output')
     parser.add_argument('--postfix', default='.mp4', type=str, help='test file type')
     parser.add_argument('--top_k', type=int, default=20)
+    #parser.add_argument('--output_base', default="/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/tag_results", type=str) #用于可视化文件
     parser.add_argument('--output_base', default="/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/tag_results", type=str) #用于可视化文件
+    #parser.add_argument('--output_json', default="/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/outjson.txt", type=str) #用于模型精度评估
     parser.add_argument('--output_json', default="/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/outjson.txt", type=str) #用于模型精度评估
     parser.add_argument('--max_worker', type=int, default=20)
     parser.add_argument('--save_feat', type=bool, default=True)
     parser.add_argument('--use_gpu', type=int, default=1)
     parser.add_argument('--imgfeat_extractor', type=str, default='Youtube8M')
     parser.add_argument('--video_feats_extractor_batch_size', type=int, default=8)
+    #parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/train_5k_A/shot_transnet_v2/output_feats')
     parser.add_argument('--feat_dir', default='/home/tione/notebook/dataset/test_5k_2nd/shot_transnet_v2/split_feats')
     parser.add_argument('--extract_video', type=bool, default=True)
     parser.add_argument('--extract_img', type=bool, default=True)
@@ -258,7 +262,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.use_gpu == 1:
-        os.environ["CUDA_VISIBLE_DEVICES"]='0'
+        os.environ["CUDA_VISIBLE_DEVICES"]='1'
     
     model = TaggingModel(args)
     test_files = glob.glob(args.test_dir+'/*'+args.postfix)

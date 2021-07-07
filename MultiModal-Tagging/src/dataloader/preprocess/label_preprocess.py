@@ -20,6 +20,7 @@ def extract_dict(dict_file):
 
         index_to_tag[index] = tag
         tag_to_index[tag] = index
+    print(tag_to_index, index_to_tag)
     return index_to_tag, tag_to_index
 
 class Preprocess_index_indentity:

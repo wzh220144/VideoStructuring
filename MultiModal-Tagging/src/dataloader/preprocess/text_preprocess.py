@@ -16,11 +16,11 @@ class Preprocess:
         asr_path = '/'.join(cols + ['asr_txt', vid])
         ocr_path = '/'.join(cols + ['ocr_txt', vid])
 
-        if os.path.exists(asr_text):
+        if os.path.exists(asr_path):
             with open(asr_path, 'r') as f:
                 for line in f:
                     text += ' ' + line.strip('\n')
-        if os.path.exists(ocr_text):
+        if os.path.exists(ocr_path):
             with open(ocr_path, 'r') as f:
                 for line in f:
                     text += ' ' + line.strip('\n')

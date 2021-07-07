@@ -79,11 +79,13 @@ class Trainer(object):
         #GPU/CPU设置
         #gpus = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
         gpus = [x.name for x in tf2.config.experimental.list_logical_devices('GPU')][:self.optimizer_config.num_gpu]
+        print(gpus)
         #gpu_devices = [x.name for x in device_lib.list_local_devices() if 'GPU' in x.device_type][:self.optimizer_config.num_gpu]
         gpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('GPU')][:self.optimizer_config.num_gpu]
+        print(gpu_devices)
         #cpu_devices = [x.name for x in device_lib.list_local_devices() if 'CPU' in x.device_type]
         cpu_devices = [x.name for x in tf2.config.experimental.list_logical_devices('CPU')]
-        #print(cpu_devices)
+        print(cpu_devices)
         num_gpus = len(gpu_devices)
         if num_gpus > 0:
             logging.info("Using the following GPUs to train: " + str(gpus))
@@ -131,7 +133,7 @@ class Trainer(object):
                 device = cpu_devices[i]
             with tf.device(device):
                 with (tf.variable_scope(("tower"), reuse=True if i > 0 else None)):
-                    with (slim.arg_scope([slim.model_variable, slim.variable], device=gpu_devices[0])):
+                    with (slim.arg_scope([slim.model_variable, slim.variable], device=gpu_devices[i])):
                         result_dict = self.model(tower_inputs[i],train_batch_size = self.reader.batch_size//num_towers, is_training=True)
     
                         #遍历所有分类任务输出
@@ -299,7 +301,6 @@ class Trainer(object):
                                     flag = True
                             if flag:
                                 tmp_dict = {'global_step': train_fetch_dict_eval['global_step'], 'train_losses_dict': train_fetch_dict_eval['train_losses_dict']}
-                                print(tmp_dict)
                                 for k, v in train_fetch_dict_eval.items():
                                     if isinstance(v, dict):
                                         for kk, vv in v.items():
@@ -313,14 +314,12 @@ class Trainer(object):
                                         'tagging_output_fusion.predictions', 'tagging_output_audio.predictions',
                                         'tagging_output_video.predictions', 'tagging_output_image.predictions', 'tagging_output_text.predictions']
                                 for k in keys:
-                                    print(k, tmp_dict[k].shape)
                                     tmp_dict[k].dump('{}_{}'.format(k, cnt))
                                 for i in range(l):
                                     res_dict = {}
                                     for k in keys:
                                         res_dict[k] = tmp_dict[k][i]
                                     res_dict['index'] = i
-                                    print(res_dict)
                             logging.info("training step {} | {} | {:.2f} Examples/sec".format(global_step_val, train_losses_info, examples_per_second))
                     except tf.errors.DataLossError:
                         logging.info("ERROR: corrupted input tfrecord")

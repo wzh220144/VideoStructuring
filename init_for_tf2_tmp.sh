@@ -19,7 +19,7 @@ if [ ! -d "${CONDA_ROOT}" ]; then
   exit 1
 fi
 # CONDA ENV
-CONDA_NEW_ENV=tf2
+CONDA_NEW_ENV=tf2.0
 # JUPYTER_ROOT
 JUPYTER_ROOT=/home/tione/notebook
 if [ ! -d "${JUPYTER_ROOT}" ]; then
@@ -87,7 +87,7 @@ source "${CONDA_ROOT}/etc/profile.d/conda.sh"
 # ###### create env and activate
 # TensorFlow 1.14 GPU dependencies - https://www.tensorflow.org/install/source#gpu
 # create env by prefix
-conda create --prefix ${JUPYTER_ROOT}/envs/${CONDA_NEW_ENV} -y cudatoolkit=10.0 cudnn=7.6.5 python=3.6 ipykernel
+conda create --prefix ${JUPYTER_ROOT}/envs/${CONDA_NEW_ENV} -y cudatoolkit=10.1 cudnn=7.6.0 python=3.6 ipykernel
 conda activate ${JUPYTER_ROOT}/envs/${CONDA_NEW_ENV}
 # create env by name
 # conda create -n ${CONDA_NEW_ENV} -y cudatoolkit=10.0 cudnn=7.6.0 python=3.7 ipykernel
@@ -105,11 +105,11 @@ pwd
 
 # tensorflow 1.14
 #pip config set global.index-url https://mirrors.tencent.com/pypi/simple/
-pip install torch==1.4.0+cu100 torchvision==0.5.0+cu100 torchaudio -f https://download.pytorch.org/whl/torch_stable.html
+pip install torch==1.8.1+cu101 torchvision==0.9.1+cu101 torchaudio -f https://download.pytorch.org/whl/torch_stable.html
 sudo apt-get install swig libpulse-dev libasound2-dev
 pip install -r requirement.txt
 pip install pytest-runner
-pip install tensorflow-gpu==2.0.0 opencv-python librosa==0.7.2 tensorboardX==2.1 easyocr SpeechRecognition PocketSphinx
+pip install tensorflow-gpu==2.2.0 opencv-python librosa==0.7.2 tensorboardX==2.1 easyocr SpeechRecognition PocketSphinx
 pip install mmcv -i http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com
 pip install numba==0.48.0
 pip install cachetools
